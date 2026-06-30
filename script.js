@@ -21,7 +21,6 @@ const SUPABASE_URL      = "https://hnaylgaqriwtpzjhcwnf.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYXlsZ2Fxcml3dHB6amhjd25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODkyNzAsImV4cCI6MjA5Mjk2NTI3MH0.GH5YFd4mVbhGUj_DiGVjqpZigcIM1AzjW7At6P1P9K4";
 const ROOM_CODE         = "staff-lobby"; // sama buat semua staff
 const ROOM_PASSWORD     = "aabb1122";   //
-const ROOM_NAME         = "STAFF\nLOBBY";
 const MAX_PEOPLE        = 20;
 /* ============================================================ */
 
@@ -34,18 +33,55 @@ function cacheColors() {
 }
 cacheColors();
 
-document.getElementById('roomTitle').innerHTML = ROOM_NAME.replace(/\n/g,'<br>');
+// ---------- Rooms ----------
+const ROOMS = {
+  lobby: {
+    name:'Staff Lobby', grid:{w:10,h:10},
+    palette:{floor:'#f3dcc4',floor2:'#ecc9aa',wallL:'#caa6c9',wallR:'#b990ba'},
+    windows:[{gy:3},{gy:6}],
+    furniture:[
+      {gx:4.5,gy:4.5,kind:'rug'},
+      {gx:1,gy:1,kind:'plant'},{gx:8,gy:1,kind:'lamp'},
+      {gx:4.5,gy:2,kind:'table'},{gx:8,gy:8,kind:'plant'},{gx:1,gy:8,kind:'table'},
+    ],
+    neighbors:{up:'gym',down:null,left:null,right:null},
+  },
+  gym: {
+    name:'Gym', grid:{w:10,h:10},
+    palette:{floor:'#d8dee8',floor2:'#c4cdda',wallL:'#8aa0b8',wallR:'#7890aa'},
+    windows:[],
+    furniture:[
+      {gx:2,  gy:2,  kind:'treadmill'},{gx:6,  gy:2,  kind:'treadmill'},
+      {gx:4.5,gy:4.5,kind:'yogamat'},
+      {gx:1.5,gy:6,  kind:'bench'},{gx:7.5,gy:6,kind:'dumbbell'},
+      {gx:1,  gy:8,  kind:'mirror'},{gx:8,  gy:8,kind:'cooler'},
+    ],
+    neighbors:{up:null,down:'lobby',left:null,right:null},
+  },
+};
+let currentRoomId = 'lobby';
+function getRoom()       { return ROOMS[currentRoomId]; }
+function applyPalette(r) {
+  C.floor=r.palette.floor; C.floor2=r.palette.floor2;
+  C.wallL=r.palette.wallL; C.wallR=r.palette.wallR;
+}
+
+document.getElementById('roomTitle').innerHTML = getRoom().name.replace(/\n/g,'<br>');
 const ONLINE = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 const cv = document.getElementById('room'); let ctx = cv.getContext('2d');
 
 // ---------- Iso grid ----------
-const GW=10, GH=10, TW=64, TH=32;
+let GW=10, GH=10; const TW=64, TH=32;
 let originX=0, originY=0, DPR=1;
+function updateOrigin() {
+  originX = innerWidth/2; originY = innerHeight/2 - (GW+GH)*TH/4 + 20;
+}
 
 // -- Offscreen canvas untuk floor+walls+windows (digambar ulang hanya saat resize) --
 let bgCanvas = null;
 function buildRoomBG() {
+  applyPalette(getRoom());
   bgCanvas = document.createElement('canvas');
   bgCanvas.width  = innerWidth  * DPR;   // device-pixel size
   bgCanvas.height = innerHeight * DPR;
@@ -61,7 +97,7 @@ function resize() {
   cv.width  = innerWidth  * DPR; cv.height = innerHeight * DPR;
   cv.style.width  = innerWidth  + 'px'; cv.style.height = innerHeight + 'px';
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.imageSmoothingEnabled = false;
-  originX = innerWidth/2; originY = innerHeight/2 - (GW+GH)*TH/4 + 20;
+  updateOrigin();
   buildRoomBG();
 }
 addEventListener('resize', resize); resize();
@@ -75,23 +111,34 @@ const SKINS  = ['#ffe0c2','#f3c39a','#d99a6c','#a86b43','#6e4326'];
 const HAIRC  = ['#2b2640','#5a3a22','#caa14a','#b5453b','#e8e4dc','#7a5cff'];
 const SHIRTS = ['#ff8fab','#7fb3ff','#8fd9b6','#ffd23f','#c79bff','#ff9f6e'];
 const HAIR_STYLES = [['short','Pendek'],['long','Panjang'],['spiky','Jabrik'],['bald','Botak']];
+const TOPS = [['plain','Polos'],['tee','Kaos'],['shirt','Kemeja'],['hoodie','Hoodie'],['dress','Dress'],['apron','Celemek']];
+const ACCS = [['none','Tanpa'],['cap','Topi'],['glasses','Kacamata'],['headband','Bando'],['badge','Badge']];
+const PRESETS = [
+  ['Seragam', {top:'apron', shirt:'#8fd9b6', acc:'badge'}],
+  ['Casual',        {top:'tee',   shirt:'#7fb3ff', acc:'none'}],
+  ['Formal',        {top:'shirt', shirt:'#fff6ec', acc:'glasses'}],
+];
 
 // ---------- State ----------
 let me = null;                 // {id,name,av,fx,fy,tx,ty,face,bubble,bubT}
 const others = new Map();
 const myId = 'u' + Math.random().toString(36).slice(2,9);
 const parts = [];
-let draft = { name:'', av:{skin:SKINS[0], hair:'short', hairColor:HAIRC[0], shirt:SHIRTS[0]} };
+let draft = { name:'', av:{skin:SKINS[0], hair:'short', hairColor:HAIRC[0], shirt:SHIRTS[0], top:'plain', acc:'none'} };
 
-function newPlayer(o) { return Object.assign({fx:5,fy:8,tx:5,ty:8,face:1,bubble:'',bubT:0}, o); }
+function newPlayer(o) { return Object.assign({fx:5,fy:8,tx:5,ty:8,face:1,bubble:'',bubT:0,posSet:false}, o); }
+function safeSpawn() {
+  const occ = new Set([...others.values()].map(o => `${Math.round(o.fx??5)},${Math.round(o.fy??5)}`));
+  let fx, fy, tries = 0;
+  do {
+    fx = 1 + Math.floor(Math.random() * (GW-2));
+    fy = 1 + Math.floor(Math.random() * (GH-2));
+    tries++;
+  } while (occ.has(`${fx},${fy}`) && tries < 40);
+  return {fx, fy};
+}
 
 // ---------- Furniture ----------
-const furniture = [
-  {gx:4.5,gy:4.5,kind:'rug'},
-  {gx:1,  gy:1,  kind:'plant'},{gx:8,gy:1,kind:'lamp'},
-  {gx:4.5,gy:2,  kind:'table'},{gx:8,gy:8,kind:'plant'},
-  {gx:1,  gy:8,  kind:'table'},
-];
 const depthOf = (gx,gy) => gx+gy;
 
 // ============================================================
@@ -126,32 +173,84 @@ function buildRow(id, arr, getVal, setVal) {
   });
 }
 function markSel(row, el) { [...row.children].forEach(c => c.classList.remove('sel')); el.classList.add('sel'); }
-function openBuilder() {
-  builderEl.style.display = 'flex';
-  // prefill dari localStorage device ini
-  try { const saved = JSON.parse(localStorage.getItem('lobbyAvatar')||'null');
-    if (saved) { draft.name=saved.name||''; draft.av=Object.assign(draft.av,saved.av); } } catch(e) {}
-  document.getElementById('nameIn2').value = draft.name;
-
-  buildRow('rowSkin',       SKINS,  () => draft.av.skin,      v => draft.av.skin=v);
-  buildRow('rowHairColor',  HAIRC,  () => draft.av.hairColor, v => draft.av.hairColor=v);
-  buildRow('rowShirt',      SHIRTS, () => draft.av.shirt,     v => draft.av.shirt=v);
-  // hair styles (button)
+// inject baris Baju / Aksesoris / Preset sekali (reuse class CSS yg ada)
+function ensureExtraRows() {
+  if (document.getElementById('rowTop')) return;
+  const after = document.getElementById('rowShirt').closest('.opt');
+  const mk = (label,id) => { const o=document.createElement('div'); o.className='opt';
+    o.innerHTML = '<span>'+label+'</span><div class="row" id="'+id+'"></div>'; return o; };
+  const rTop=mk('Baju','rowTop'), rAcc=mk('Aksesoris','rowAcc'), rPre=mk('Preset','rowPreset');
+  after.after(rTop); rTop.after(rAcc); rAcc.after(rPre);
+}
+function buildBtnRow(id, arr, getVal, setVal) {
+  const row = document.getElementById(id); row.innerHTML = '';
+  arr.forEach(([k,label]) => {
+    const b = document.createElement('div'); b.className='hs'+(getVal()===k?' sel':''); b.textContent=label;
+    b.onclick = () => { setVal(k); [...row.children].forEach(c=>c.classList.remove('sel')); b.classList.add('sel'); drawPreview(); };
+    row.appendChild(b);
+  });
+}
+function buildPresetRow() {
+  const row = document.getElementById('rowPreset'); row.innerHTML = '';
+  PRESETS.forEach(([label,set]) => {
+    const b = document.createElement('div'); b.className='hs'; b.textContent=label;
+    b.onclick = () => { Object.assign(draft.av, set); buildAllRows(); };
+    row.appendChild(b);
+  });
+}
+function buildAllRows() {
+  buildRow('rowSkin',      SKINS,  () => draft.av.skin,      v => draft.av.skin=v);
+  buildRow('rowHairColor', HAIRC,  () => draft.av.hairColor, v => draft.av.hairColor=v);
+  buildRow('rowShirt',     SHIRTS, () => draft.av.shirt,     v => draft.av.shirt=v);
   const rs = document.getElementById('rowHairStyle'); rs.innerHTML = '';
   HAIR_STYLES.forEach(([k,label]) => {
     const b = document.createElement('div'); b.className='hs'+(draft.av.hair===k?' sel':''); b.textContent=label;
     b.onclick = () => { draft.av.hair=k; [...rs.children].forEach(c=>c.classList.remove('sel')); b.classList.add('sel'); drawPreview(); };
     rs.appendChild(b);
   });
+  buildBtnRow('rowTop', TOPS, () => draft.av.top||'plain', v => draft.av.top=v);
+  buildBtnRow('rowAcc', ACCS, () => draft.av.acc||'none',  v => draft.av.acc=v);
+  buildPresetRow();
   drawPreview();
-
-  // load avatar by nama (cross-device) kalau online
+}
+function enableBackdropClose(on) {
+  builderEl.onclick = on ? (e) => { if (e.target===builderEl) { builderEl.style.display='none'; builderEl.onclick=null; } } : null;
+}
+function openBuilder(mode) {
+  mode = mode || 'create';
+  builderEl.style.display = 'flex';
+  ensureExtraRows();
   const ni = document.getElementById('nameIn2');
-  ni.onchange = async () => {
-    draft.name = ni.value.trim();
-    if (ONLINE && draft.name) await loadProfileByName(draft.name);
-  };
-  document.getElementById('enterBtn').onclick = finishBuilder;
+  const enterBtn = document.getElementById('enterBtn');
+  const h2 = builderEl.querySelector('h2');
+  if (mode === 'edit') {
+    // mode Lemari: pakai avatar yg lagi dipakai, nama dikunci
+    draft.name = me.name; draft.av = JSON.parse(JSON.stringify(me.av));
+    ni.value = me.name; ni.readOnly = true; ni.onchange = null;
+    document.getElementById('loadNote').textContent = '';
+    if (h2) h2.textContent = 'GANTI BAJU';
+    enterBtn.textContent = 'SIMPAN';
+    enterBtn.onclick = applyCloset;
+    enableBackdropClose(true);
+  } else {
+    try { const saved = JSON.parse(localStorage.getItem('lobbyAvatar')||'null');
+      if (saved) { draft.name=saved.name||''; draft.av=Object.assign(draft.av,saved.av); } } catch(e) {}
+    ni.value = draft.name; ni.readOnly = false;
+    if (h2) h2.textContent = 'BIKIN AVATAR';
+    enterBtn.textContent = 'MASUK ROOM';
+    ni.onchange = async () => { draft.name = ni.value.trim();
+      if (ONLINE && draft.name) await loadProfileByName(draft.name); };
+    enterBtn.onclick = finishBuilder;
+    enableBackdropClose(false);
+  }
+  buildAllRows();
+}
+// ganti baju saat udah di room → update avatar + sync live ke staff lain
+function applyCloset() {
+  me.av = JSON.parse(JSON.stringify(draft.av));
+  localStorage.setItem('lobbyAvatar', JSON.stringify({name:me.name, av:me.av}));
+  builderEl.style.display = 'none'; builderEl.onclick = null;
+  if (ONLINE) { saveProfile(); if (channel) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}); }
 }
 async function loadProfileByName(name) {
   const note = document.getElementById('loadNote'); note.textContent = 'Cek avatar lama...';
@@ -165,14 +264,7 @@ async function loadProfileByName(name) {
     } else note.textContent = 'Nama baru — bikin avatar baru';
   } catch(e) { note.textContent = ''; }
 }
-function openRefreshRows() { // re-mark selections + preview tanpa reset draft
-  buildRow('rowSkin',      SKINS,  () => draft.av.skin,      v => draft.av.skin=v);
-  buildRow('rowHairColor', HAIRC,  () => draft.av.hairColor, v => draft.av.hairColor=v);
-  buildRow('rowShirt',     SHIRTS, () => draft.av.shirt,     v => draft.av.shirt=v);
-  const rs = document.getElementById('rowHairStyle');
-  [...rs.children].forEach(c => c.classList.toggle('sel', c.textContent===(HAIR_STYLES.find(h=>h[0]===draft.av.hair)||[])[1]));
-  drawPreview();
-}
+function openRefreshRows() { buildAllRows(); }
 function drawPreview() {
   pctx.clearRect(0, 0, pv.width, pv.height);
   pctx.save(); pctx.translate(60, 128); pctx.scale(1.7, 1.7);
@@ -182,8 +274,9 @@ function finishBuilder() {
   const nm = (document.getElementById('nameIn2').value||'Staff').trim().slice(0,14);
   draft.name = nm;
   localStorage.setItem('lobbyAvatar', JSON.stringify({name:nm, av:draft.av}));
+  const _sp = safeSpawn();
   me = newPlayer({id:myId, name:nm, av:JSON.parse(JSON.stringify(draft.av)),
-    fx:1+Math.random()*(GW-2), fy:GH-2});
+    fx:_sp.fx, fy:_sp.fy, posSet:true});
   me.tx = me.fx; me.ty = me.fy;
   builderEl.style.display = 'none';
   if (ONLINE) initOnline(); else initDemo();
@@ -213,6 +306,15 @@ function heart() { if (!me) return; spawnHearts(me);
   if (ONLINE && channel) channel.send({type:'broadcast',event:'emote',payload:{id:myId}}); }
 document.getElementById('heartBtn').onclick = heart;
 
+// tombol Lemari (ganti baju saat di room)
+(function addClosetBtn() {
+  const bar = document.querySelector('.bar');
+  const b = document.createElement('div'); b.className = 'btn'; b.id = 'closetBtn';
+  b.textContent = '👕'; b.title = 'Ganti baju';
+  b.onclick = () => { if (me) openBuilder('edit'); };
+  bar.insertBefore(b, document.getElementById('heartBtn'));
+})();
+
 // ---------- chat / log / hearts ----------
 function say(p, text) { p.bubble=text; p.bubT=performance.now()+5000; }
 const logEl = document.getElementById('log');
@@ -233,16 +335,31 @@ function diamond(x,y,fill) { ctx.beginPath(); ctx.moveTo(x,y); ctx.lineTo(x+TW/2
 function quad(x1,y1,x2,y2,x3,y3,x4,y4,fill) { ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
   ctx.lineTo(x3,y3); ctx.lineTo(x4,y4); ctx.closePath(); ctx.fillStyle=fill; ctx.fill();
   ctx.strokeStyle='rgba(0,0,0,.12)'; ctx.lineWidth=1; ctx.stroke(); }
+function drawDoorGap(ax,ay,bx,by,H) {
+  // sill bawah (golden threshold)
+  ctx.beginPath(); ctx.moveTo(ax,ay); ctx.lineTo(bx,by);
+  ctx.lineTo(bx,by-H*0.35); ctx.lineTo(ax,ay-H*0.35); ctx.closePath();
+  ctx.fillStyle='#c89b45'; ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=1; ctx.stroke();
+  // lorong gelap di atas
+  ctx.beginPath(); ctx.moveTo(ax,ay-H*0.35); ctx.lineTo(bx,by-H*0.35);
+  ctx.lineTo(bx,by-H); ctx.lineTo(ax,ay-H); ctx.closePath();
+  ctx.fillStyle='rgba(20,16,40,.88)'; ctx.fill();
+}
 function drawFloor() {
   for (let gy=0; gy<GH; gy++) for (let gx=0; gx<GW; gx++) { const s=iso(gx,gy);
     diamond(s.x, s.y, (gx+gy)%2===0 ? C.floor : C.floor2); }
-  const H = 46;
+  const H = 46; const nb = getRoom().neighbors;
   for (let gx=0; gx<GW; gx++) { const a=iso(gx,0), b=iso(gx+1,0);
-    quad(a.x,a.y, b.x,b.y, b.x,b.y-H, a.x,a.y-H, C.wallL); }
+    (nb.up && (gx===GW/2-1 || gx===GW/2))
+      ? drawDoorGap(a.x,a.y,b.x,b.y,H)
+      : quad(a.x,a.y,b.x,b.y,b.x,b.y-H,a.x,a.y-H,C.wallL); }
   for (let gy=0; gy<GH; gy++) { const a=iso(0,gy), b=iso(0,gy+1);
-    quad(a.x,a.y, b.x,b.y, b.x,b.y-H, a.x,a.y-H, C.wallR); }
-  const w=iso(0,3);  drawWindow(w.x,  w.y-H+6);
-  const w2=iso(0,6); drawWindow(w2.x, w2.y-H+6);
+    (nb.left && (gy===GH/2-1 || gy===GH/2))
+      ? drawDoorGap(a.x,a.y,b.x,b.y,H)
+      : quad(a.x,a.y,b.x,b.y,b.x,b.y-H,a.x,a.y-H,C.wallR); }
+  const wins = getRoom().windows||[];
+  wins.forEach(w => { const p=iso(0,w.gy); drawWindow(p.x,p.y-H+6); });
 }
 function drawWindow(x,y) { ctx.save(); ctx.fillStyle='#bfe6ff'; ctx.fillRect(x-2,y,30,28);
   ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.strokeRect(x-2,y,30,28);
@@ -266,14 +383,117 @@ function drawFurniture(f) { const s=iso(f.gx,f.gy);
     ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.stroke();
     ctx.fillStyle='#a9743f'; ctx.fillRect(s.x-22,s.y+12,4,16); ctx.fillRect(s.x+18,s.y+12,4,16);
     ctx.fillStyle=C.cream; ctx.fillRect(s.x-12,s.y+2,8,7); ctx.fillRect(s.x+4,s.y+4,8,7); }
+  if (f.kind==='treadmill') {
+    ctx.fillStyle='#7a8ba0';
+    ctx.beginPath(); ctx.moveTo(s.x,s.y-4); ctx.lineTo(s.x+28,s.y+10);
+    ctx.lineTo(s.x,s.y+24); ctx.lineTo(s.x-28,s.y+10); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle='#4a5a6e'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(s.x-16,s.y+10); ctx.lineTo(s.x+16,s.y+10); ctx.stroke();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(s.x-10,s.y+6); ctx.lineTo(s.x-10,s.y-26); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s.x+10,s.y+6); ctx.lineTo(s.x+10,s.y-26); ctx.stroke();
+    ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(s.x-10,s.y-26); ctx.lineTo(s.x+10,s.y-26); ctx.stroke();
+    ctx.fillStyle='#5bc4e8'; ctx.fillRect(s.x-5,s.y-32,10,7);
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5; ctx.strokeRect(s.x-5,s.y-32,10,7); }
+  if (f.kind==='dumbbell') {
+    ctx.fillStyle='#8a8a8a'; ctx.strokeStyle=C.ink; ctx.lineWidth=1.5;
+    ctx.fillRect(s.x-16,s.y-3,32,6); ctx.strokeRect(s.x-16,s.y-3,32,6);
+    ctx.fillStyle='#3d3d3d';
+    ctx.beginPath(); ctx.ellipse(s.x-18,s.y,5,8,0,0,7); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(s.x+18,s.y,5,8,0,0,7); ctx.fill(); ctx.stroke(); }
+  if (f.kind==='bench') {
+    ctx.fillStyle='#666'; ctx.strokeStyle=C.ink; ctx.lineWidth=1.5;
+    ctx.fillRect(s.x-20,s.y+10,4,14); ctx.strokeRect(s.x-20,s.y+10,4,14);
+    ctx.fillRect(s.x+16,s.y+10,4,14); ctx.strokeRect(s.x+16,s.y+10,4,14);
+    ctx.fillStyle='#7a4e2a';
+    ctx.beginPath(); ctx.moveTo(s.x,s.y-4); ctx.lineTo(s.x+28,s.y+10);
+    ctx.lineTo(s.x,s.y+24); ctx.lineTo(s.x-28,s.y+10); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle='#a06030'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(s.x-8,s.y+7); ctx.lineTo(s.x+8,s.y+7); ctx.stroke(); }
+  if (f.kind==='yogamat') {
+    ctx.save(); ctx.globalAlpha=0.88; ctx.fillStyle='#7fb3ff';
+    ctx.beginPath(); ctx.moveTo(s.x-4,s.y-2); ctx.lineTo(s.x+36,s.y+16);
+    ctx.lineTo(s.x+30,s.y+26); ctx.lineTo(s.x-10,s.y+8); ctx.closePath(); ctx.fill();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.strokeStyle='rgba(255,255,255,.45)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(s.x+4,s.y+1); ctx.lineTo(s.x+32,s.y+17); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s.x+12,s.y-1); ctx.lineTo(s.x+40,s.y+15); ctx.stroke();
+    ctx.restore(); }
+  if (f.kind==='mirror') {
+    ctx.fillStyle='#3a3a50'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-11,s.y-42,22,46); ctx.strokeRect(s.x-11,s.y-42,22,46);
+    ctx.fillStyle='#cde4ff'; ctx.save(); ctx.globalAlpha=0.82;
+    ctx.fillRect(s.x-8,s.y-39,16,38); ctx.restore();
+    ctx.fillStyle='rgba(255,255,255,.48)'; ctx.fillRect(s.x-6,s.y-37,3,30);
+    ctx.fillStyle='#3a3a50'; ctx.strokeStyle=C.ink; ctx.lineWidth=1.5;
+    ctx.fillRect(s.x-7,s.y+4,14,5); ctx.strokeRect(s.x-7,s.y+4,14,5); }
+  if (f.kind==='cooler') {
+    ctx.fillStyle='#e0f0ff'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-9,s.y-24,18,28); ctx.strokeRect(s.x-9,s.y-24,18,28);
+    ctx.fillStyle='#90c8e8';
+    ctx.fillRect(s.x-9,s.y-28,18,6); ctx.strokeRect(s.x-9,s.y-28,18,6);
+    ctx.fillStyle='#b8e4ff'; ctx.save(); ctx.globalAlpha=0.9;
+    ctx.beginPath(); ctx.ellipse(s.x,s.y-28,6,8,0,0,7); ctx.fill(); ctx.restore();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.ellipse(s.x,s.y-28,6,8,0,0,7); ctx.stroke();
+    ctx.fillStyle='#5bc4e8'; ctx.strokeStyle=C.ink; ctx.lineWidth=1;
+    ctx.fillRect(s.x-3,s.y-2,6,4); ctx.strokeRect(s.x-3,s.y-2,6,4); }
+}
+function drawDoorLabels() {
+  const nb = getRoom().neighbors; const H = 46;
+  ctx.save(); ctx.font='15px VT323'; ctx.textAlign='center'; ctx.fillStyle=C.sun;
+  if (nb.up) { const p=iso(GW/2-0.5,0);
+    ctx.fillText('▲ '+ROOMS[nb.up].name, p.x, p.y-H-6); }
+  if (nb.left) { const p=iso(0,GH/2-0.5);
+    ctx.fillText('◄ '+ROOMS[nb.left].name, p.x-18, p.y-H-6); }
+  if (nb.down) { const p=iso(GW/2-0.5,GH-0.5);
+    ctx.fillText('▼ '+ROOMS[nb.down].name, p.x, p.y+TH+4); }
+  if (nb.right) { const p=iso(GW-0.5,GH/2-0.5);
+    ctx.fillText('► '+ROOMS[nb.right].name, p.x+18, p.y+TH+4); }
+  ctx.restore();
 }
 
 // gambar karakter di origin (kaki di 0,0) — dipakai room & preview
 function drawChar(c, av, face) {
+  const top = av.top||'plain', acc = av.acc||'none';
+  const ex = face>=0 ? 2 : -2;
   c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0,8,14,6,0,0,7); c.fill();
   c.fillStyle='#2b2640'; c.fillRect(-7,-6,5,8); c.fillRect(2,-6,5,8);          // kaki
+
+  // dress: rok menutup kaki (digambar sebelum badan)
+  if (top==='dress') {
+    c.beginPath(); c.moveTo(-10,-6); c.lineTo(10,-6); c.lineTo(16,9); c.lineTo(-16,9); c.closePath();
+    c.fillStyle=av.shirt; c.fill(); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke();
+  }
+
   rr(c,-10,-24,20,20,5,av.shirt); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke(); // badan
-  rr(c,-9,-40,18,18,7,av.skin); c.stroke();                                    // kepala
+
+  // detail baju
+  if (top==='tee') {
+    c.fillStyle=av.shirt; c.fillRect(-13,-22,4,8); c.fillRect(9,-22,4,8);
+    c.strokeStyle='#2b2640'; c.lineWidth=1.5; c.strokeRect(-13,-22,4,8); c.strokeRect(9,-22,4,8);
+    c.fillStyle='#fff6ec'; c.fillRect(-4,-24,8,2);
+  } else if (top==='shirt') {
+    c.fillStyle='#fff6ec'; c.fillRect(-2,-23,4,18);
+    c.fillStyle='#2b2640'; [-19,-13,-7].forEach(by=>c.fillRect(-1,by,2,2));
+    c.fillStyle='#fff6ec';
+    c.beginPath(); c.moveTo(-5,-24); c.lineTo(0,-19); c.lineTo(-1,-24); c.closePath(); c.fill();
+    c.beginPath(); c.moveTo(5,-24);  c.lineTo(0,-19); c.lineTo(1,-24);  c.closePath(); c.fill();
+  } else if (top==='hoodie') {
+    c.fillStyle=av.shirt; c.beginPath(); c.arc(0,-23,9,Math.PI,0); c.fill();
+    c.strokeStyle='#2b2640'; c.lineWidth=1.5; c.stroke();
+    c.fillStyle='rgba(0,0,0,.12)'; c.fillRect(-7,-12,14,7);
+    c.strokeStyle='#2b2640'; c.beginPath(); c.moveTo(-3,-22);c.lineTo(-3,-17); c.moveTo(3,-22);c.lineTo(3,-17); c.stroke();
+  } else if (top==='apron') {
+    rr(c,-8,-21,16,17,3,'#fff6ec'); c.strokeStyle='#2b2640'; c.lineWidth=1.5; c.stroke();
+    c.strokeStyle='#2b2640'; c.beginPath(); c.moveTo(-5,-21);c.lineTo(-3,-26); c.moveTo(5,-21);c.lineTo(3,-26); c.stroke();
+    c.fillStyle='#ff8fab'; c.beginPath(); c.ellipse(0,-11,2.5,2,0,0,7); c.fill();   // paw
+    [[-3,-14],[0,-15],[3,-14]].forEach(([px,py])=>{c.beginPath();c.arc(px,py,1.1,0,7);c.fill();});
+  }
+
+  rr(c,-9,-40,18,18,7,av.skin); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke(); // kepala
   // rambut
   c.fillStyle = av.hairColor;
   if (av.hair==='short') { c.beginPath(); c.arc(0,-34,10,Math.PI,0); c.fill();
@@ -283,16 +503,39 @@ function drawChar(c, av, face) {
   else if (av.hair==='spiky') { [-8,-3,2,7].forEach(hx => { c.beginPath();
     c.moveTo(hx-3,-32); c.lineTo(hx+3,-32); c.lineTo(hx,-44); c.closePath(); c.fill(); });
     c.fillRect(-10,-34,20,3); }
+
+  // aksesoris kepala (di atas rambut)
+  if (acc==='cap') {
+    c.fillStyle=av.shirt; c.beginPath(); c.arc(0,-38,11,Math.PI,0); c.fill();
+    c.fillRect(2,-39,14,3);
+    c.strokeStyle='#2b2640'; c.lineWidth=1.5; c.stroke();
+  } else if (acc==='headband') {
+    c.fillStyle='#ff8fab'; c.fillRect(-10,-39,20,3);
+    c.beginPath(); c.moveTo(9,-39); c.lineTo(14,-42); c.lineTo(14,-36); c.closePath(); c.fill();
+  }
+
   // mata + pipi
-  const ex = face>=0 ? 2 : -2;
   c.fillStyle='#2b2640'; c.fillRect(-5+ex,-30,2.5,3); c.fillRect(2+ex,-30,2.5,3);
   c.fillStyle='rgba(255,143,171,.6)'; c.fillRect(-7+ex,-27,3,2); c.fillRect(5+ex,-27,3,2);
+
+  // kacamata (di atas mata)
+  if (acc==='glasses') {
+    c.strokeStyle='#2b2640'; c.lineWidth=1.5;
+    c.strokeRect(-6+ex,-32,5,5); c.strokeRect(1+ex,-32,5,5);
+    c.beginPath(); c.moveTo(-1+ex,-30); c.lineTo(1+ex,-30); c.stroke();
+  }
+  // badge staff (di dada)
+  if (acc==='badge') {
+    rr(c,-9,-19,6,6,1,'#ffd23f'); c.strokeStyle='#2b2640'; c.lineWidth=1; c.stroke();
+    c.fillStyle='#ff8fab'; c.beginPath(); c.arc(-6,-16,1,0,7); c.fill();
+  }
 }
 function rr(c,x,y,w,h,r,fill) { c.beginPath(); c.moveTo(x+r,y);
   c.arcTo(x+w,y,x+w,y+h,r); c.arcTo(x+w,y+h,x,y+h,r); c.arcTo(x,y+h,x,y,r); c.arcTo(x,y,x+w,y,r);
   c.closePath(); c.fillStyle=fill; c.fill(); }
 
 function drawAvatar(p, now) {
+  if (!p.av || p.fx == null || isNaN(p.fx)) return;
   const s=iso(p.fx,p.fy); const bob=Math.sin(now/250+p.fx)*1.5; const x=s.x, y=s.y-bob;
   ctx.save(); ctx.translate(x,y); drawChar(ctx,p.av,p.face); ctx.restore();
   // nametag
@@ -329,6 +572,7 @@ function moveToward(p, dt) { const dx=p.tx-p.fx, dy=p.ty-p.fy, d=Math.hypot(dx,d
 function update(dt, t) {
   if (me) moveToward(me, dt); others.forEach(o => moveToward(o,dt));
   if (ONLINE && me) maybeSendMove();
+  checkDoorZone();
   for (let i=parts.length-1; i>=0; i--) { const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.life-=dt*0.6;
     if (p.life<=0) parts.splice(i,1); }
 }
@@ -338,12 +582,14 @@ function render(t) {
   // dw/dh = innerWidth/Height (logical): dengan transform DPR mengisi tepat cv.width x cv.height fisik
   ctx.drawImage(bgCanvas, 0, 0, innerWidth, innerHeight);
   const ents = [];
-  furniture.forEach(f => ents.push({d:depthOf(f.gx,f.gy), draw:()=>drawFurniture(f)}));
+  getRoom().furniture.forEach(f => ents.push({d:depthOf(f.gx,f.gy), draw:()=>drawFurniture(f)}));
   if (me) ents.push({d:depthOf(me.fx,me.fy)+.01, draw:()=>drawAvatar(me,t)});
   others.forEach(o => ents.push({d:depthOf(o.fx,o.fy), draw:()=>drawAvatar(o,t)}));
   ents.sort((a,b) => a.d-b.d).forEach(e => e.draw());
+
   parts.forEach(p => { ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=C.rose;
     ctx.font='18px VT323'; ctx.textAlign='center'; ctx.fillText('♥',p.x,p.y); ctx.globalAlpha=1; });
+  drawDoorLabels();
   updateCount();
 }
 
@@ -365,7 +611,8 @@ function initDemo() {
   const names = ['Dara','Sok','Vannak','Lina','Rith'];
   names.forEach((nm,i) => {
     const av = {skin:SKINS[i%SKINS.length], hair:HAIR_STYLES[i%4][0],
-      hairColor:HAIRC[i%HAIRC.length], shirt:SHIRTS[i%SHIRTS.length]};
+      hairColor:HAIRC[i%HAIRC.length], shirt:SHIRTS[i%SHIRTS.length],
+      top:TOPS[(i+1)%TOPS.length][0], acc:ACCS[i%ACCS.length][0]};
     const p = newPlayer({id:'npc'+i, name:nm, av, fx:1+i*1.6, fy:2+(i%3)});
     p.tx=p.fx; p.ty=p.fy; others.set(p.id, p);
   });
@@ -406,18 +653,21 @@ function startRealtime() {
   setupChannel();
 }
 function setupChannel() {
-  channel = sb.channel('room:'+ROOM_CODE, {config:{presence:{key:myId}, broadcast:{self:false}}});
+  channel = sb.channel('room:'+ROOM_CODE+':'+currentRoomId, {config:{presence:{key:myId}, broadcast:{self:false}}});
 
   channel.on('presence', {event:'sync'}, () => {
     const st=channel.presenceState(); const live=new Set();
     Object.entries(st).forEach(([id,arr]) => { if(id===myId) return; const v=arr[0]; live.add(id);
-      if (!others.has(id)) others.set(id, newPlayer({id, name:v.name, av:v.av, fx:v.fx, fy:v.fy, tx:v.fx, ty:v.fy}));
-      else { const o=others.get(id); o.name=v.name; o.av=v.av; } });
+      if (!others.has(id)) others.set(id, newPlayer({id, name:v.name, av:v.av,
+        ...(v.fx != null ? {fx:v.fx, fy:v.fy, tx:v.fx, ty:v.fy, posSet:true} : {})}));
+      else { const o=others.get(id); o.name=v.name; o.av=v.av;
+        if (!o.posSet && v.fx != null) { o.fx=v.fx; o.fy=v.fy; o.tx=v.fx; o.ty=v.fy; o.posSet=true; } } });
     [...others.keys()].forEach(id => { if (!live.has(id)) others.delete(id); });
     updateCount();
   });
   channel.on('broadcast', {event:'move'}, ({payload}) => { const o=others.get(payload.id);
-    if (o) { o.tx=payload.tx; o.ty=payload.ty; } });
+    if (o) { o.tx=payload.tx; o.ty=payload.ty;
+      if (!o.posSet) { o.fx=payload.tx; o.fy=payload.ty; o.posSet=true; } } });
   channel.on('broadcast', {event:'chat'}, ({payload}) => { let o=others.get(payload.id);
     if (o) { say(o, payload.text); } addLog(payload.name, payload.text, false); });
   channel.on('broadcast', {event:'emote'}, ({payload}) => { const o=others.get(payload.id); if(o) spawnHearts(o); });
@@ -455,6 +705,55 @@ function cleanupChannel() {
 }
 window.addEventListener('beforeunload', cleanupChannel);
 window.addEventListener('pagehide',     cleanupChannel); // lebih reliable di iOS Safari
+
+// ============================================================
+//  MULTI-ROOM — door latch + transition
+// ============================================================
+let doorArmed = false;
+function checkDoorZone() {
+  if (!me) return;
+  const nb = getRoom().neighbors;
+  const rx = Math.round(me.fx), ry = Math.round(me.fy);
+  const inDoorX = rx === GW/2-1 || rx === GW/2;
+  const inDoorY = ry === GH/2-1 || ry === GH/2;
+  const nearUp    = !!nb.up    && me.fy < 0.5      && inDoorX;
+  const nearDown  = !!nb.down  && me.fy > GH-1.5   && inDoorX;
+  const nearLeft  = !!nb.left  && me.fx < 0.5      && inDoorY;
+  const nearRight = !!nb.right && me.fx > GW-1.5   && inDoorY;
+  const inAnyZone = nearUp || nearDown || nearLeft || nearRight;
+  if (!inAnyZone) { doorArmed = true; return; }
+  if (!doorArmed) return;
+  if      (nearUp)    enterRoom(nb.up,    'up');
+  else if (nearDown)  enterRoom(nb.down,  'down');
+  else if (nearLeft)  enterRoom(nb.left,  'left');
+  else if (nearRight) enterRoom(nb.right, 'right');
+}
+function enterRoom(roomId, fromSide) {
+  doorArmed = false;
+  currentRoomId = roomId;
+  const r = getRoom();
+  GW = r.grid.w; GH = r.grid.h;
+  const cx = r.grid.w/2 - 0.5, cy = r.grid.h/2 - 0.5;
+  const sp = {
+    up:    {fx:cx,           fy:r.grid.h-2},
+    down:  {fx:cx,           fy:1},
+    left:  {fx:r.grid.w-2,  fy:cy},
+    right: {fx:1,            fy:cy},
+  }[fromSide];
+  me.fx=sp.fx; me.fy=sp.fy; me.tx=sp.fx; me.ty=sp.fy;
+  others.clear();
+  _countStr = '';
+  updateOrigin();
+  buildRoomBG();
+  document.getElementById('roomTitle').innerHTML = r.name.replace(/\n/g,'<br>');
+  updateCount();
+  if (ONLINE) {
+    _reconnecting = false;
+    statusLabel = 'Connecting';
+    cleanupChannel();
+    setupChannel();
+  }
+}
 
 function sendMove() { if(channel) channel.send({type:'broadcast',event:'move',payload:{id:myId,tx:me.tx,ty:me.ty}}); }
 function maybeSendMove() { const now=performance.now();
