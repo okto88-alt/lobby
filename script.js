@@ -17,8 +17,8 @@
      create policy "anon insert" on profiles for insert with check (true);
      create policy "anon update" on profiles for update using (true) with check (true);
    ============================================================ */
-const SUPABASE_URL      = "";    https://hnaylgaqriwtpzjhcwnf.supabase.co        // https://xxxx.supabase.co
-const SUPABASE_ANON_KEY = "";    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYXlsZ2Fxcml3dHB6amhjd25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODkyNzAsImV4cCI6MjA5Mjk2NTI3MH0.GH5YFd4mVbhGUj_DiGVjqpZigcIM1AzjW7At6P1P9K4        // anon public key
+const SUPABASE_URL      = "https://hnaylgaqriwtpzjhcwnf.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhuYXlsZ2Fxcml3dHB6amhjd25mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzczODkyNzAsImV4cCI6MjA5Mjk2NTI3MH0.GH5YFd4mVbhGUj_DiGVjqpZigcIM1AzjW7At6P1P9K4";
 const ROOM_CODE         = "staff-lobby"; // sama buat semua staff
 const ROOM_PASSWORD     = "aabb1122";   //
 const ROOM_NAME         = "STAFF\nLOBBY";
