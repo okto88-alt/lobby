@@ -633,6 +633,7 @@ let _reconnecting = false; // guard biar tidak dobel channel saat error beruntun
 let moveStopTimer = null; // debounce: track() 600ms setelah berhenti gerak
 let subscribed = false; // true hanya saat channel benar-benar SUBSCRIBED
 let socket = null; // Socket.io — movement realtime, terpisah dari Supabase
+let watchdogInterval = null, lastPresenceSuccess = 0; // deteksi Supabase channel yang mati diam-diam
 
 function initOnline() {
   statusLabel = 'Connecting'; updateCount();
@@ -662,6 +663,14 @@ function startRealtime() {
   });
   setupChannel();
 }
+function startWatchdog() {
+  clearInterval(watchdogInterval);
+  watchdogInterval = setInterval(() => {
+    if (subscribed && (performance.now()-lastPresenceSuccess>15000)) {
+      resubscribe(); // channel Supabase mati diam-diam: gak ada presence/track sukses
+    }
+  }, 8000);
+}
 function setupChannel() {
   const _topic = 'room:'+ROOM_CODE+':'+currentRoomId;
   const ch = sb.channel(_topic, {config:{presence:{key:myId}, broadcast:{self:false}}});
@@ -674,6 +683,7 @@ function setupChannel() {
         ...(v.fx != null ? {fx:v.fx, fy:v.fy, tx:v.fx, ty:v.fy, posSet:true} : {})}));
       else { const o=others.get(id); o.name=v.name; o.av=v.av; } });
     [...others.keys()].forEach(id => { if (!live.has(id)) others.delete(id); });
+    if (Object.keys(st).length > 0) lastPresenceSuccess = performance.now();
     updateCount();
   });
   ch.on('broadcast', {event:'chat'}, ({payload}) => { let o=others.get(payload.id);
@@ -686,6 +696,7 @@ function setupChannel() {
       subscribed = true;
       statusLabel = 'Online'; document.getElementById('dot').classList.add('on');
       await ch.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy});
+      lastPresenceSuccess = performance.now();
       if (socket) socket.emit('join-room', currentRoomId);
       updateCount();
     } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') {
@@ -695,6 +706,7 @@ function setupChannel() {
       updateCount(); setTimeout(resubscribe, 3000);
     }
   });
+  startWatchdog();
 }
 async function resubscribe() {
   // guard: skip jika sudah ada proses reconnect berjalan
@@ -708,6 +720,7 @@ async function resubscribe() {
 // Tidak untrack saat visibilitychange=hidden supaya avatar tidak kedip di mobile
 async function cleanupChannel() {
   subscribed = false;
+  clearInterval(watchdogInterval); watchdogInterval = null;
   if (!channel || !sb) return;
   const ch = channel;
   channel = null;
@@ -775,7 +788,7 @@ function maybeSendMove() { const now=performance.now();
   if (now-lastMoveSent>120 && (me.tx!==lastX || me.ty!==lastY)) { lastMoveSent=now; lastX=me.tx; lastY=me.ty;
     sendMove();
     clearTimeout(moveStopTimer);
-    moveStopTimer = setTimeout(() => { if (channel && subscribed) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}); }, 600);
+    moveStopTimer = setTimeout(() => { if (channel && subscribed) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}).then(() => { lastPresenceSuccess = performance.now(); }); }, 600);
   } }
 
 // -- Mobile: naikkan chat bar + log saat keyboard virtual muncul --
