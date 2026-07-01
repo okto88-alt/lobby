@@ -108,7 +108,7 @@ const ROOMS = {
       {gx:8,gy:5,kind:'bookshelf'},
       {gx:1,gy:8,kind:'plant'},{gx:8,gy:8,kind:'plant'},
     ],
-    neighbors:{up:null,down:null,left:'gym',right:null},
+    neighbors:{up:null,down:null,left:'gym',right:'beach'},
   },
   stadium: {
     name:'Stadium', grid:{w:20,h:16},
@@ -123,6 +123,21 @@ const ROOMS = {
       {gx:10,gy:1, kind:'scoreboard'},
     ],
     neighbors:{up:null,down:null,left:null,right:'garden'},
+  },
+  beach: {
+    name:'Beach', grid:{w:18,h:14},
+    palette:{floor:'#e8d08a',floor2:'#dcc070',wallL:'#2a6aaa',wallR:'#1a5a9a'},
+    windows:[],
+    furniture:[
+      {gx:3, gy:6,  kind:'beach_umbrella'},{gx:3, gy:8.5,kind:'beach_chair'},
+      {gx:9, gy:6,  kind:'beach_umbrella'},{gx:9, gy:8.5,kind:'beach_chair'},
+      {gx:15,gy:6,  kind:'beach_umbrella'},{gx:15,gy:8.5,kind:'beach_chair'},
+      {gx:1, gy:6,  kind:'surfboard'},{gx:1, gy:11, kind:'surfboard'},
+      {gx:9, gy:11, kind:'beach_ball'},
+      {gx:5, gy:11, kind:'cooler_box'},{gx:13,gy:11,kind:'cooler_box'},
+      {gx:9, gy:9.5,kind:'table'},
+    ],
+    neighbors:{up:null,down:null,left:'office',right:null},
   },
 };
 const FRAMES = {
@@ -140,8 +155,10 @@ const FRAMES = {
               {gy:6, wall:'top',  img:'assets/office-2.png',  frame:'dark'} ],
   stadium:  [ {gy:5,  wall:'left', img:'assets/stadium-1.png', frame:'metal'},
               {gy:15, wall:'top',  img:'assets/stadium-2.png', frame:'metal'} ],
+  beach:    [ {gy:2, wall:'left', img:'assets/beach-1.png', frame:'wood'},
+              {gy:8, wall:'top',  img:'assets/beach-2.png', frame:'wood'} ],
 };
-const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a' };
+const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0' };
 const FRAME_STYLES = {
   gold:  {border:'#c8a020', thick:4, mat:'#fff6ec'},
   metal: {border:'#aaaaaa', thick:2, mat:null},
@@ -500,6 +517,64 @@ function drawFloor() {
   drawRoomFrames();
   if (currentRoomId==='stadium') drawStadiumField();
 }
+// -- Beach: gelombang + kilau pasir, dianimasikan tiap frame di render() bukan di-bake ke bgCanvas --
+const BEACH_SPARKLES = [[3,3],[7,5],[11,2],[5,9],[14,7],[9,11],[2,10],[16,10]]; // posisi tetap, cuma opacity yang goyang
+const BEACH_WAVE_BANDS = [
+  {gy:0.5, color:'#4db8ff', alpha:0.7, fillAlpha:0.3,  lw:3},
+  {gy:2,   color:'#80ccff', alpha:0.6, fillAlpha:0.25, lw:2.5},
+  {gy:3.5, color:'#ffffff', alpha:0.5, fillAlpha:0.2,  lw:2},
+];
+function waveCrestY(gx, bi, t) {
+  // amplitudo 8px, fase geser seiring waktu (t/300) = efek ombak scroll masuk ke pantai
+  return Math.sin(gx*0.4 + t/300 + bi*1.7) * 8;
+}
+function drawBeachWaveBand(c, band, bi, t) {
+  const step = 2, thickness = 26; // tebal isi band di bawah garis crest, biar solid bukan cuma garis
+  c.beginPath();
+  const first = iso(0, band.gy);
+  const y0 = first.y + waveCrestY(0, bi, t);
+  c.moveTo(first.x, y0);
+  const pts = [{x:first.x, y:y0}];
+  for (let gx = step; gx <= GW; gx += step) {
+    const mid = iso(gx - step/2, band.gy);
+    const end = iso(gx, band.gy);
+    const midY = mid.y + waveCrestY(gx - step/2, bi, t);
+    const endY = end.y + waveCrestY(gx, bi, t);
+    c.quadraticCurveTo(mid.x, midY, end.x, endY);
+    pts.push({x:end.x, y:endY});
+  }
+  c.globalAlpha = band.alpha; c.strokeStyle = band.color; c.lineWidth = band.lw;
+  c.stroke(); // garis crest warna band dulu, sebelum path dilanjut turun ke base
+  c.globalAlpha = Math.min(1, band.alpha + 0.25); c.strokeStyle = '#ffffff'; c.lineWidth = 1;
+  c.stroke(); // busa putih tipis persis di puncak gelombang
+  const last = pts[pts.length-1];
+  c.lineTo(last.x, last.y + thickness);
+  c.lineTo(first.x, y0 + thickness);
+  c.closePath();
+  c.globalAlpha = band.fillAlpha; c.fillStyle = band.color;
+  c.fill(); // isi solid di bawah garis crest
+}
+function drawBeachDecor(c, t) {
+  c.save();
+  // clip ke area lantai (diamond iso) biar wave gak nembus keluar wall kanan/pinggir
+  const top = iso(0,0), right = iso(GW,0), bottom = iso(GW,GH), left = iso(0,GH);
+  c.beginPath();
+  c.moveTo(top.x, top.y);
+  c.lineTo(right.x, right.y);
+  c.lineTo(bottom.x, bottom.y);
+  c.lineTo(left.x, left.y);
+  c.closePath();
+  c.clip();
+  BEACH_WAVE_BANDS.forEach((band, bi) => drawBeachWaveBand(c, band, bi, t));
+  c.globalAlpha = 1; // reset biar sparkle dots (pake rgba sendiri) gak ke-multiply
+  BEACH_SPARKLES.forEach(([gx,gy], i) => {
+    const alpha = 0.25 + 0.45 * (0.5 + 0.5*Math.sin(t/500 + i*1.3));
+    const p = iso(gx, gy);
+    c.fillStyle = `rgba(255,255,255,${alpha.toFixed(2)})`;
+    c.beginPath(); c.arc(p.x, p.y, 1.5, 0, 7); c.fill();
+  });
+  c.restore();
+}
 function drawStadiumField() {
   const p = iso(9.5, 7.5); // titik tengah lapangan
   ctx.save();
@@ -745,6 +820,37 @@ function drawFurniture(f) { const s=iso(f.gx,f.gy);
     ctx.fillStyle='#5bf05b'; ctx.font='9px VT323'; ctx.textAlign='center';
     ctx.fillText('STADIUM', s.x, s.y-22);
     ctx.font='7px VT323'; ctx.fillText('0 - 0', s.x, s.y-12); }
+  if (f.kind==='beach_umbrella') {
+    ctx.strokeStyle='#8a5a34'; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y+15); ctx.lineTo(s.x,s.y-35); ctx.stroke();
+    ctx.save(); ctx.beginPath(); ctx.arc(s.x,s.y-35,20,Math.PI,0); ctx.clip();
+    const stripeCols=['#e04040','#ffffff'];
+    for (let i=-20;i<20;i+=5) { ctx.fillStyle=stripeCols[Math.abs(i)%10<5?0:1]; ctx.fillRect(s.x+i,s.y-60,5,30); }
+    ctx.restore();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(s.x,s.y-35,20,Math.PI,0); ctx.stroke(); }
+  if (f.kind==='beach_chair') {
+    ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(-0.15);
+    ctx.fillStyle='#ffd23f'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(-10,-5,20,10); ctx.strokeRect(-10,-5,20,10);
+    ctx.strokeStyle='rgba(0,0,0,.2)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(-7,-5); ctx.lineTo(-7,5); ctx.moveTo(0,-5); ctx.lineTo(0,5); ctx.moveTo(7,-5); ctx.lineTo(7,5); ctx.stroke();
+    ctx.restore(); }
+  if (f.kind==='surfboard') {
+    rr(ctx,s.x-4,s.y-42,8,30,3,'#5bc4e8'); ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.stroke();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y-39); ctx.lineTo(s.x,s.y-15); ctx.stroke();
+    ctx.fillStyle='#ff8fab'; ctx.beginPath(); ctx.arc(s.x,s.y-27,5,0,7); ctx.fill(); }
+  if (f.kind==='beach_ball') {
+    const cols=['#e04040','#4070e0','#ffd23f','#ffffff'];
+    for (let i=0;i<4;i++) { ctx.fillStyle=cols[i];
+      ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.arc(s.x,s.y,10,i*Math.PI/2,(i+1)*Math.PI/2); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5; ctx.beginPath(); ctx.arc(s.x,s.y,10,0,7); ctx.stroke(); }
+  if (f.kind==='cooler_box') {
+    ctx.fillStyle='#e0f0ff'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-10,s.y-15,20,15); ctx.strokeRect(s.x-10,s.y-15,20,15);
+    ctx.strokeStyle='#7a8890'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(s.x-5,s.y-15); ctx.lineTo(s.x-5,s.y-23); ctx.lineTo(s.x+5,s.y-23); ctx.lineTo(s.x+5,s.y-15); ctx.stroke(); }
 }
 // -- Stadium NPC: random walker lokal, gak sync network --
 const STADIUM_NPC_NAMES = ['Budi','Sari','Deni','Rini','Agus','Dewi','Hendra','Putri'];
@@ -829,6 +935,29 @@ function drawBall(b) {
     i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py); }
   ctx.closePath(); ctx.fill();
   ctx.restore();
+}
+// -- Beach NPC: sama polanya kayak stadium, tapi lebih santai (lambat + jeda lama) --
+const BEACH_NPC_NAMES = ['Surfer','Santai','Liburan','Chill'];
+const beachNPCs = BEACH_NPC_NAMES.map(name => ({
+  fx: 3+Math.random()*12, fy: 3+Math.random()*8,
+  tx: 3+Math.random()*12, ty: 3+Math.random()*8,
+  speed: 0.4, name, pauseT: 0, face: 1,
+  av: {
+    skin: SKINS[Math.floor(Math.random()*SKINS.length)],
+    hairColor: HAIRC[Math.floor(Math.random()*HAIRC.length)],
+    hair: _npcHair[Math.floor(Math.random()*_npcHair.length)],
+    shirt: SHIRTS[Math.floor(Math.random()*SHIRTS.length)],
+    top: _npcTops[Math.floor(Math.random()*_npcTops.length)],
+    acc: 'none',
+  },
+}));
+function updateBeachNPCs(dt, now) {
+  beachNPCs.forEach(n => {
+    if (n.pauseT > now) return;
+    const dx=n.tx-n.fx, dy=n.ty-n.fy, d=Math.hypot(dx,dy);
+    if (d>0.05) { const k=Math.min(1,(n.speed*dt)/d); n.fx+=dx*k; n.fy+=dy*k; n.face=dx>=0?1:-1; }
+    else { n.tx=3+Math.random()*12; n.ty=3+Math.random()*8; n.pauseT=now+3000+Math.random()*3000; }
+  });
 }
 function drawDoorLabels() {
   const nb = getRoom().neighbors; const H = 46;
@@ -971,6 +1100,7 @@ function update(dt, t) {
   if (ONLINE && me) maybeSendMove();
   checkDoorZone();
   if (currentRoomId==='stadium') { updateStadiumNPCs(dt, t); updateStadiumBall(dt, t); }
+  if (currentRoomId==='beach') updateBeachNPCs(dt, t);
   for (let i=parts.length-1; i>=0; i--) { const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.life-=dt*0.6;
     if (p.life<=0) parts.splice(i,1); }
 }
@@ -979,11 +1109,13 @@ function render(t) {
   // blit floor+walls+windows dari offscreen canvas — 1:1 device pixel, tidak blur
   // dw/dh = innerWidth/Height (logical): dengan transform DPR mengisi tepat cv.width x cv.height fisik
   ctx.drawImage(bgCanvas, 0, 0, innerWidth, innerHeight);
+  if (currentRoomId==='beach') drawBeachDecor(ctx, t);
   const ents = [];
   getRoom().furniture.forEach(f => ents.push({d:depthOf(f.gx,f.gy), draw:()=>drawFurniture(f)}));
   if (me) ents.push({d:depthOf(me.fx,me.fy)+.01, draw:()=>drawAvatar(me,t)});
   others.forEach(o => ents.push({d:depthOf(o.fx,o.fy), draw:()=>drawAvatar(o,t)}));
   if (currentRoomId==='stadium') stadiumNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
+  if (currentRoomId==='beach') beachNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='stadium') ents.push({d:depthOf(stadiumBall.fx,stadiumBall.fy)-.01, draw:()=>drawBall(stadiumBall)});
   ents.sort((a,b) => a.d-b.d).forEach(e => e.draw());
   drawAmbient(t);
