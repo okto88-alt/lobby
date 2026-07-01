@@ -22,11 +22,15 @@
     background:#2b2640;color:#fff;border:3px solid #fff;font-size:20px;line-height:1;cursor:pointer;
     display:flex;align-items:center;justify-content:center;font-family:sans-serif;}
   #frame-modal .frame-close:hover{background:#ff6b6b;}
+  #roomFade{position:fixed;inset:0;z-index:10;background:#000;opacity:0;pointer-events:none;
+    transition:opacity .15s linear;}
+  #roomFade.show{opacity:1;}
 </style>
 </head>
 <body>
 
 <canvas id="room"></canvas>
+<div id="roomFade"></div>
 <div class="logo"><h1 id="roomTitle">STAFF<br>LOBBY</h1></div>
 <div class="status"><span class="dot" id="dot"></span><span id="statusTxt">Demo</span></div>
 <div id="log"></div>

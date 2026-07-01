@@ -712,15 +712,15 @@ function drawChar(c, av, face) {
   const top = av.top||'plain', acc = av.acc||'none';
   const ex = face>=0 ? 2 : -2;
   c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0,8,14,6,0,0,7); c.fill();
-  c.fillStyle='#2b2640'; c.fillRect(-7,-6,5,8); c.fillRect(2,-6,5,8);          // kaki
+  rr(c,-7,-6,5,8,2,'#2b2640'); rr(c,2,-6,5,8,2,'#2b2640');                    // kaki
 
   // lengan + tangan (arms + hands, selalu pakai warna av.skin)
   c.strokeStyle='#2b2640'; c.lineWidth=1.5;
-  rr(c,-12,-21,3,14,2,av.skin); c.stroke();
-  rr(c,9, -21,3,14,2,av.skin); c.stroke();
+  rr(c,-12,-19,3,14,2,av.skin); c.stroke();
+  rr(c,9, -19,3,14,2,av.skin); c.stroke();
   c.fillStyle=av.skin;
-  c.beginPath(); c.arc(-10.5,-5,2.5,0,7); c.fill(); c.stroke();
-  c.beginPath(); c.arc(10.5,-5,2.5,0,7);  c.fill(); c.stroke();
+  c.beginPath(); c.arc(-10.5,-3,2.5,0,7); c.fill(); c.stroke();
+  c.beginPath(); c.arc(10.5,-3,2.5,0,7);  c.fill(); c.stroke();
 
   // dress: rok menutup kaki (digambar sebelum badan)
   if (top==='dress') {
@@ -728,7 +728,7 @@ function drawChar(c, av, face) {
     c.fillStyle=av.shirt; c.fill(); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke();
   }
 
-  rr(c,-10,-24,20,20,5,av.shirt); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke(); // badan
+  rr(c,-10,-20,20,16,5,av.shirt); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke(); // badan
 
   // detail baju
   if (top==='tee') {
@@ -753,7 +753,7 @@ function drawChar(c, av, face) {
     [[-3,-14],[0,-15],[3,-14]].forEach(([px,py])=>{c.beginPath();c.arc(px,py,1.1,0,7);c.fill();});
   }
 
-  rr(c,-9,-40,18,18,7,av.skin); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke(); // kepala
+  rr(c,-10,-42,20,20,9,av.skin); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke(); // kepala
   // rambut
   c.fillStyle = av.hairColor;
   if (av.hair==='short') { c.beginPath(); c.arc(0,-34,8,Math.PI,0); c.fill();
@@ -797,7 +797,7 @@ function rr(c,x,y,w,h,r,fill) { c.beginPath(); c.moveTo(x+r,y);
 function drawAvatar(p, now) {
   if (!p.av || p.fx == null || isNaN(p.fx)) return;
   const s=iso(p.fx,p.fy); const bob=Math.sin(now/250+p.fx)*1.5; const x=s.x, y=s.y-bob;
-  ctx.save(); ctx.translate(x,y); drawChar(ctx,p.av,p.face); ctx.restore();
+  ctx.save(); ctx.translate(x,y); ctx.scale(1.15,1.15); drawChar(ctx,p.av,p.face); ctx.restore();
   // nametag
   ctx.font='15px VT323'; ctx.textAlign='center';
   const tw = ctx.measureText(p.name).width + 12;
@@ -1055,7 +1055,7 @@ async function cleanupChannel() {
   if (!channel || !sb) return;
   const ch = channel;
   channel = null;
-  try { await ch.untrack(); } catch(e) {}
+  try { await Promise.race([ ch.untrack(), new Promise(r => setTimeout(r, 800)) ]); } catch(e) {}
   try { sb.removeChannel(ch); } catch(e) {}
 }
 window.addEventListener('beforeunload', cleanupChannel);
@@ -1083,7 +1083,13 @@ function checkDoorZone() {
   else if (nearLeft)  enterRoom(nb.left,  'left');
   else if (nearRight) enterRoom(nb.right, 'right');
 }
+function fadeTransition(show) {
+  const el = document.getElementById('roomFade');
+  if (!el) return;
+  el.classList.toggle('show', show);
+}
 async function enterRoom(roomId, fromSide) {
+  fadeTransition(true);
   doorArmed = false;
   currentRoomId = roomId;
   const r = getRoom();
@@ -1103,15 +1109,16 @@ async function enterRoom(roomId, fromSide) {
   if (ONLINE) {
     _reconnecting = false;
     statusLabel = 'Connecting';
-    await cleanupChannel(); // tunggu untrack+removeChannel lama beres dulu
-    others.clear();         // baru clear setelah channel lama benar-benar mati
+    others.clear();
     updateCount();
+    await cleanupChannel(); // di-cap 800ms via Promise.race, gak nunggu tanpa batas
     setupChannel();
     if (socket) { socket.emit('join-room', currentRoomId); socket.emit('change-room', { id: myId, newRoom: currentRoomId }); }
   } else {
     others.clear();
     updateCount();
   }
+  fadeTransition(false);
 }
 
 function sendMove() { if (socket && socket.connected) socket.emit('move', { room: currentRoomId, id: myId, tx: me.tx, ty: me.ty }); }
