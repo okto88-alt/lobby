@@ -137,7 +137,7 @@ const ROOMS = {
       {gx:5, gy:11, kind:'cooler_box'},{gx:13,gy:11,kind:'cooler_box'},
       {gx:9, gy:9.5,kind:'table'},
     ],
-    neighbors:{up:null,down:null,left:'office',right:null},
+    neighbors:{up:null,down:null,left:'office',right:'yacht'},
   },
   casino: {
     name:'Casino', grid:{w:18,h:16},
@@ -167,6 +167,20 @@ const ROOMS = {
     ],
     neighbors:{up:null,down:'kitchen',left:null,right:null},
   },
+  yacht: {
+    name:'Yacht', grid:{w:16,h:12},
+    palette:{floor:'#8B6914',floor2:'#7a5a10',wallL:'#1a6aaa',wallR:'#1a5a9a'},
+    windows:[],
+    furniture:[
+      {gx:8,  gy:2,  kind:'yacht_wheel'},
+      {gx:2,  gy:2,  kind:'life_ring'},{gx:14, gy:2, kind:'life_ring'},
+      {gx:3,  gy:8,  kind:'deck_chair'},{gx:6, gy:8, kind:'deck_chair'},{gx:9, gy:8, kind:'deck_chair'},
+      {gx:13, gy:9,  kind:'anchor'},
+      {gx:8,  gy:6,  kind:'sail_mast'},
+      {gx:1,  gy:9,  kind:'fishing_rod'},{gx:14,gy:9.5, kind:'fishing_rod'},
+    ],
+    neighbors:{up:null,down:null,left:'beach',right:null},
+  },
 };
 const FRAMES = {
   lobby:    [ {gy:2, wall:'left', img:'assets/lobby-1.webp',   frame:'gold'},
@@ -189,8 +203,10 @@ const FRAMES = {
               {gy:9,  wall:'top',  img:'assets/casino-2.webp', frame:'gold'} ],
   rooftop:  [ {gy:2, wall:'left', img:'assets/rooftop-1.webp', frame:'dark'},
               {gy:6, wall:'top',  img:'assets/rooftop-2.webp', frame:'dark'} ],
+  yacht:    [ {gy:2, wall:'left', img:'assets/yacht-1.webp', frame:'dark'},
+              {gy:6, wall:'top',  img:'assets/yacht-2.webp', frame:'dark'} ],
 };
-const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0', casino:'#8B1a1a', rooftop:'#1a1a2e' };
+const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0', casino:'#8B1a1a', rooftop:'#1a1a2e', yacht:'#1a6aaa' };
 const FRAME_STYLES = {
   gold:  {border:'#c8a020', thick:4, mat:'#fff6ec'},
   metal: {border:'#aaaaaa', thick:2, mat:null},
@@ -550,6 +566,7 @@ function drawFloor() {
   if (currentRoomId==='stadium') drawStadiumField();
   if (currentRoomId==='casino') drawCasinoDecor();
   if (currentRoomId==='rooftop') drawRooftopDecor();
+  if (currentRoomId==='yacht') drawYachtDecor();
 }
 // -- Beach: gelombang + kilau pasir, dianimasikan tiap frame di render() bukan di-bake ke bgCanvas --
 const BEACH_SPARKLES = [[3,3],[7,5],[11,2],[5,9],[14,7],[9,11],[2,10],[16,10]]; // posisi tetap, cuma opacity yang goyang
@@ -647,6 +664,57 @@ function drawRooftopDecor() {
   ctx.beginPath(); ctx.arc(p.x, p.y-H-20, 10, 0, 7); ctx.fill();
   ctx.fillStyle = 'rgba(15,15,30,.55)';
   ctx.beginPath(); ctx.arc(p.x+4, p.y-H-23, 9, 0, 7); ctx.fill();
+  ctx.restore();
+}
+function drawYachtDecor() {
+  ctx.save(); ctx.strokeStyle='rgba(0,0,0,.12)'; ctx.lineWidth=1.5;
+  for (let gy=2; gy<GH; gy+=2) { const a=iso(0,gy), b=iso(GW,gy);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+  ctx.restore();
+  const coilAt = (gx,gy) => {
+    const p = iso(gx,gy);
+    ctx.save(); ctx.strokeStyle='#5a3a1a'; ctx.lineWidth=1.5;
+    ctx.beginPath();
+    for (let a=0; a<Math.PI*6; a+=0.3) { const r=a*0.55;
+      const x=p.x+Math.cos(a)*r, y=p.y+Math.sin(a)*r*0.5;
+      a===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y); }
+    ctx.stroke(); ctx.restore();
+  };
+  coilAt(1.3,1.3); coilAt(GW-1.3,GH-1.3);
+  drawDeckRailing();
+  drawYachtBow();
+}
+function drawDeckRailing() {
+  const postH = 8;
+  const edges = [
+    {n:GW, pt:(i)=>iso(i,0)},
+    {n:GH, pt:(i)=>iso(GW,i)},
+    {n:GW, pt:(i)=>iso(GW-i,GH)},
+    {n:GH, pt:(i)=>iso(0,GH-i)},
+  ];
+  ctx.save(); ctx.strokeStyle='#f0f0f0'; ctx.lineWidth=2;
+  edges.forEach(edge => {
+    let prev = null;
+    for (let i=0; i<=edge.n; i+=2) {
+      const p = edge.pt(i);
+      ctx.beginPath(); ctx.moveTo(p.x,p.y); ctx.lineTo(p.x,p.y-postH); ctx.stroke();
+      if (prev) { ctx.beginPath(); ctx.moveTo(prev.x,prev.y-postH); ctx.lineTo(p.x,p.y-postH); ctx.stroke(); }
+      prev = p;
+    }
+  });
+  ctx.restore();
+}
+function drawYachtBow() {
+  const H = 46;
+  const p = iso(1, 0);
+  ctx.save();
+  ctx.fillStyle = '#f0f0e0'; ctx.strokeStyle = C.ink; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(p.x-14, p.y-H+4);
+  ctx.lineTo(p.x+14, p.y-H+4);
+  ctx.lineTo(p.x, p.y-H-26);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
   ctx.restore();
 }
 function drawWindow(x,y) { ctx.save(); ctx.fillStyle='#bfe6ff'; ctx.fillRect(x-2,y,30,28);
@@ -993,6 +1061,59 @@ function drawFurniture(f) { const s=iso(f.gx,f.gy);
         ctx.fillRect(s.x+dx+wx, baseY-h+wy, 2, 3);
       }
     }); }
+  if (f.kind==='yacht_wheel') {
+    ctx.fillStyle='#5a4a3a'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-6,s.y-4,12,26); ctx.strokeRect(s.x-6,s.y-4,12,26);
+    const wy = s.y-30;
+    ctx.strokeStyle='#3a2010'; ctx.lineWidth=5;
+    ctx.beginPath(); ctx.arc(s.x,wy,18,0,7); ctx.stroke();
+    for (let i=0;i<8;i++) { const a=i*Math.PI/4;
+      ctx.beginPath(); ctx.moveTo(s.x,wy); ctx.lineTo(s.x+Math.cos(a)*18,wy+Math.sin(a)*18); ctx.stroke(); }
+    ctx.fillStyle='#3a2010'; ctx.beginPath(); ctx.arc(s.x,wy,5,0,7); ctx.fill();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5; ctx.stroke(); }
+  if (f.kind==='life_ring') {
+    const cy = s.y-20;
+    const segCols=['#e04040','#ffffff'];
+    for (let i=0;i<4;i++) { ctx.fillStyle=segCols[i%2];
+      ctx.beginPath(); ctx.moveTo(s.x,cy); ctx.arc(s.x,cy,14,i*Math.PI/2,(i+1)*Math.PI/2); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.beginPath(); ctx.arc(s.x,cy,14,0,7); ctx.stroke();
+    ctx.fillStyle='#0a3a5a'; ctx.beginPath(); ctx.arc(s.x,cy,6,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.5)'; ctx.lineWidth=1.5;
+    for (let i=0;i<8;i++) { const a=i*Math.PI/4; ctx.beginPath();
+      ctx.moveTo(s.x+Math.cos(a)*14, cy+Math.sin(a)*14);
+      ctx.lineTo(s.x+Math.cos(a)*16.5, cy+Math.sin(a)*16.5); ctx.stroke(); } }
+  if (f.kind==='deck_chair') {
+    ctx.save(); ctx.translate(s.x,s.y); ctx.rotate(-0.12);
+    ctx.fillStyle='#f0f0e0'; ctx.strokeStyle=C.ink; ctx.lineWidth=1.5;
+    ctx.fillRect(-12,-5,24,12); ctx.strokeRect(-12,-5,24,12);
+    ctx.strokeStyle='rgba(0,0,0,.18)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(-8,-5); ctx.lineTo(-8,7); ctx.moveTo(0,-5); ctx.lineTo(0,7); ctx.moveTo(8,-5); ctx.lineTo(8,7); ctx.stroke();
+    ctx.strokeStyle='#c8c8b0'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(-12,7); ctx.lineTo(-12,13); ctx.moveTo(12,7); ctx.lineTo(12,13); ctx.stroke();
+    ctx.restore(); }
+  if (f.kind==='anchor') {
+    ctx.strokeStyle='#2a2a3a'; ctx.lineWidth=5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(s.x-18,s.y-48); ctx.lineTo(s.x+18,s.y-48); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s.x,s.y-48); ctx.lineTo(s.x,s.y+4); ctx.stroke();
+    ctx.beginPath(); ctx.arc(s.x,s.y-36,8,0,7); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s.x,s.y+4); ctx.quadraticCurveTo(s.x-24,s.y+20,s.x-20,s.y-4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(s.x,s.y+4); ctx.quadraticCurveTo(s.x+24,s.y+20,s.x+20,s.y-4); ctx.stroke();
+    ctx.lineCap='butt'; }
+  if (f.kind==='sail_mast') {
+    ctx.strokeStyle='#5a4a3a'; ctx.lineWidth=4;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y+4); ctx.lineTo(s.x,s.y-96); ctx.stroke();
+    ctx.fillStyle='#f5f5f0'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y-92); ctx.lineTo(s.x+36,s.y-24); ctx.lineTo(s.x,s.y-24); ctx.closePath();
+    ctx.fill(); ctx.stroke();
+    ctx.strokeStyle='rgba(120,120,120,.6)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y-92); ctx.lineTo(s.x+20,s.y+4); ctx.moveTo(s.x,s.y-92); ctx.lineTo(s.x-20,s.y+4); ctx.stroke(); }
+  if (f.kind==='fishing_rod') {
+    ctx.strokeStyle='#8a6a3a'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.moveTo(s.x-2,s.y+4); ctx.lineTo(s.x+41,s.y-58); ctx.stroke();
+    ctx.strokeStyle='rgba(220,220,220,.7)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(s.x+41,s.y-58); ctx.lineTo(s.x+30,s.y+2); ctx.stroke();
+    ctx.fillStyle='#ffd23f'; ctx.beginPath(); ctx.arc(s.x+30,s.y+4,3,0,7); ctx.fill();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.stroke(); }
 }
 // -- Stadium NPC: random walker lokal, gak sync network --
 const STADIUM_NPC_NAMES = ['Budi','Sari','Deni','Rini','Agus','Dewi','Hendra','Putri'];
@@ -1165,6 +1286,29 @@ function drawRooftopStars(t) {
   });
   ctx.restore();
 }
+// -- Yacht NPC: santai di dek, jalan pelan (0.6) dengan jeda 3-5s --
+const YACHT_NPC_NAMES = ['Kapten','Sailor','Marina','Porto'];
+const yachtNPCs = YACHT_NPC_NAMES.map((name,i) => ({
+  fx: 2+Math.random()*12, fy: 2+Math.random()*8,
+  tx: 2+Math.random()*12, ty: 2+Math.random()*8,
+  speed: 0.6, name, pauseT: 0, face: 1,
+  av: {
+    skin: SKINS[Math.floor(Math.random()*SKINS.length)],
+    hairColor: HAIRC[Math.floor(Math.random()*HAIRC.length)],
+    hair: _npcHair[Math.floor(Math.random()*_npcHair.length)],
+    shirt: i===0 ? '#1a2a4a' : SHIRTS[Math.floor(Math.random()*SHIRTS.length)],
+    top: i===0 ? 'shirt' : _npcTops[Math.floor(Math.random()*_npcTops.length)],
+    acc: 'none',
+  },
+}));
+function updateYachtNPCs(dt, now) {
+  yachtNPCs.forEach(n => {
+    if (n.pauseT > now) return;
+    const dx=n.tx-n.fx, dy=n.ty-n.fy, d=Math.hypot(dx,dy);
+    if (d>0.05) { const k=Math.min(1,(n.speed*dt)/d); n.fx+=dx*k; n.fy+=dy*k; n.face=dx>=0?1:-1; }
+    else { n.tx=2+Math.random()*12; n.ty=2+Math.random()*8; n.pauseT=now+3000+Math.random()*2000; }
+  });
+}
 function drawDoorLabels() {
   const nb = getRoom().neighbors; const H = 46;
   ctx.save(); ctx.font='15px VT323'; ctx.textAlign='center'; ctx.fillStyle=C.sun;
@@ -1309,6 +1453,7 @@ function update(dt, t) {
   if (currentRoomId==='beach') updateBeachNPCs(dt, t);
   if (currentRoomId==='casino') updateCasinoNPCs(dt, t);
   if (currentRoomId==='rooftop') updateRooftopNPCs(dt, t);
+  if (currentRoomId==='yacht') updateYachtNPCs(dt, t);
   for (let i=parts.length-1; i>=0; i--) { const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.life-=dt*0.6;
     if (p.life<=0) parts.splice(i,1); }
 }
@@ -1319,6 +1464,7 @@ function render(t) {
   ctx.drawImage(bgCanvas, 0, 0, innerWidth, innerHeight);
   if (currentRoomId==='beach') drawBeachDecor(ctx, t);
   if (currentRoomId==='rooftop') drawRooftopStars(t);
+  if (currentRoomId==='yacht') drawYachtWaves(t);
   const ents = [];
   getRoom().furniture.forEach(f => ents.push({d:depthOf(f.gx,f.gy), draw:()=>drawFurniture(f)}));
   if (me) ents.push({d:depthOf(me.fx,me.fy)+.01, draw:()=>drawAvatar(me,t)});
@@ -1327,6 +1473,7 @@ function render(t) {
   if (currentRoomId==='beach') beachNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='casino') casinoNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='rooftop') rooftopNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
+  if (currentRoomId==='yacht') yachtNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='stadium') ents.push({d:depthOf(stadiumBall.fx,stadiumBall.fy)-.01, draw:()=>drawBall(stadiumBall)});
   ents.sort((a,b) => a.d-b.d).forEach(e => e.draw());
   drawAmbient(t);
@@ -1366,6 +1513,32 @@ function drawStringLightsPulse(f, t) {
     ctx.fillStyle='#ffdd88'; ctx.beginPath(); ctx.arc(bx,by+2,2,0,7); ctx.fill();
     ctx.restore();
   }
+}
+function drawYachtWaves(t) {
+  const H = 46;
+  drawYachtWallWaves(t, 'top', H);
+  drawYachtWallWaves(t, 'left', H);
+}
+function drawYachtWallWaves(t, axis, H) {
+  const bands = [
+    {h:0.20, color:'#4db8ff', alpha:.55, lw:4,   amp:7},
+    {h:0.36, color:'#80ccff', alpha:.5,  lw:4,   amp:8},
+    {h:0.52, color:'#4db8ff', alpha:.45, lw:3.5, amp:9},
+    {h:0.68, color:'#80ccff', alpha:.4,  lw:3.5, amp:10},
+    {h:0.84, color:'#ffffff', alpha:.3,  lw:3,   amp:6},
+  ];
+  const N = axis==='top' ? GW : GH;
+  bands.forEach((band, bi) => {
+    ctx.save(); ctx.beginPath();
+    for (let i=0; i<=N; i++) {
+      const a = axis==='top' ? iso(i,0) : iso(0,i);
+      const wob = Math.sin(i*0.5 + t/400 + bi*1.7) * band.amp;
+      const x = a.x, y = a.y - H*band.h + wob;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    }
+    ctx.strokeStyle = band.color; ctx.globalAlpha = band.alpha; ctx.lineWidth = band.lw;
+    ctx.stroke(); ctx.restore();
+  });
 }
 function drawFountainSpray(f, t) {
   const s = iso(f.gx, f.gy); const cx = s.x, cy = s.y - 16;
