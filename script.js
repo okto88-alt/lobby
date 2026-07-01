@@ -653,30 +653,32 @@ function startRealtime() {
   setupChannel();
 }
 function setupChannel() {
-  channel = sb.channel('room:'+ROOM_CODE+':'+currentRoomId, {config:{presence:{key:myId}, broadcast:{self:false}}});
+  const _topic = 'room:'+ROOM_CODE+':'+currentRoomId;
+  const ch = sb.channel(_topic, {config:{presence:{key:myId}, broadcast:{self:false}}});
+  channel = ch;
 
-  channel.on('presence', {event:'sync'}, () => {
-    const st=channel.presenceState(); const live=new Set();
+  ch.on('presence', {event:'sync'}, () => {
+    const st = ch.presenceState(); const live = new Set();
     Object.entries(st).forEach(([id,arr]) => { if(id===myId) return; const v=arr[0]; live.add(id);
       if (!others.has(id)) others.set(id, newPlayer({id, name:v.name, av:v.av,
         ...(v.fx != null ? {fx:v.fx, fy:v.fy, tx:v.fx, ty:v.fy, posSet:true} : {})}));
       else { const o=others.get(id); o.name=v.name; o.av=v.av;
-        if (!o.posSet && v.fx != null) { o.fx=v.fx; o.fy=v.fy; o.tx=v.fx; o.ty=v.fy; o.posSet=true; } } });
+        if (v.fx != null) { o.fx=v.fx; o.fy=v.fy; o.tx=v.fx; o.ty=v.fy; o.posSet=true; } } });
     [...others.keys()].forEach(id => { if (!live.has(id)) others.delete(id); });
     updateCount();
   });
-  channel.on('broadcast', {event:'move'}, ({payload}) => { const o=others.get(payload.id);
+  ch.on('broadcast', {event:'move'}, ({payload}) => { const o=others.get(payload.id);
     if (o) { o.tx=payload.tx; o.ty=payload.ty;
       if (!o.posSet) { o.fx=payload.tx; o.fy=payload.ty; o.posSet=true; } } });
-  channel.on('broadcast', {event:'chat'}, ({payload}) => { let o=others.get(payload.id);
+  ch.on('broadcast', {event:'chat'}, ({payload}) => { let o=others.get(payload.id);
     if (o) { say(o, payload.text); } addLog(payload.name, payload.text, false); });
-  channel.on('broadcast', {event:'emote'}, ({payload}) => { const o=others.get(payload.id); if(o) spawnHearts(o); });
+  ch.on('broadcast', {event:'emote'}, ({payload}) => { const o=others.get(payload.id); if(o) spawnHearts(o); });
 
-  channel.subscribe(async st => {
+  ch.subscribe(async st => {
     if (st === 'SUBSCRIBED') {
       _reconnecting = false;
       statusLabel = 'Online'; document.getElementById('dot').classList.add('on');
-      await channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy});
+      await ch.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy});
       updateCount();
     } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') {
       // reset flag dulu — jika reconnect attempt-nya sendiri gagal, retry tetap bisa jalan
@@ -686,22 +688,22 @@ function setupChannel() {
     }
   });
 }
-function resubscribe() {
+async function resubscribe() {
   // guard: skip jika sudah ada proses reconnect berjalan
   if (!sb || !me || _reconnecting) return;
   _reconnecting = true;
-  try { sb.removeChannel(channel); } catch(e) {}
-  channel = null;
+  await cleanupChannel();
   setupChannel(); // reuse sb yang ada, tidak createClient ulang
 }
 
 // -- Ghost cleanup: untrack + removeChannel hanya saat tab benar-benar ditutup --
 // Tidak untrack saat visibilitychange=hidden supaya avatar tidak kedip di mobile
-function cleanupChannel() {
+async function cleanupChannel() {
   if (!channel || !sb) return;
-  try { channel.untrack(); } catch(e) {}
-  try { sb.removeChannel(channel); } catch(e) {}
+  const ch = channel;
   channel = null;
+  try { await ch.untrack(); } catch(e) {}
+  try { sb.removeChannel(ch); } catch(e) {}
 }
 window.addEventListener('beforeunload', cleanupChannel);
 window.addEventListener('pagehide',     cleanupChannel); // lebih reliable di iOS Safari
@@ -728,7 +730,7 @@ function checkDoorZone() {
   else if (nearLeft)  enterRoom(nb.left,  'left');
   else if (nearRight) enterRoom(nb.right, 'right');
 }
-function enterRoom(roomId, fromSide) {
+async function enterRoom(roomId, fromSide) {
   doorArmed = false;
   currentRoomId = roomId;
   const r = getRoom();
@@ -741,24 +743,27 @@ function enterRoom(roomId, fromSide) {
     right: {fx:1,            fy:cy},
   }[fromSide];
   me.fx=sp.fx; me.fy=sp.fy; me.tx=sp.fx; me.ty=sp.fy;
-  others.clear();
   _countStr = '';
   updateOrigin();
   buildRoomBG();
   document.getElementById('roomTitle').innerHTML = r.name.replace(/\n/g,'<br>');
-  updateCount();
   if (ONLINE) {
     _reconnecting = false;
     statusLabel = 'Connecting';
-    cleanupChannel();
+    await cleanupChannel(); // tunggu untrack+removeChannel lama beres dulu
+    others.clear();         // baru clear setelah channel lama benar-benar mati
+    updateCount();
     setupChannel();
+  } else {
+    others.clear();
+    updateCount();
   }
 }
 
 function sendMove() { if(channel) channel.send({type:'broadcast',event:'move',payload:{id:myId,tx:me.tx,ty:me.ty}}); }
 function maybeSendMove() { const now=performance.now();
   if (now-lastMoveSent>120 && (me.tx!==lastX || me.ty!==lastY)) { lastMoveSent=now; lastX=me.tx; lastY=me.ty;
-    sendMove(); if(channel) channel.track({name:me.name,av:me.av,fx:me.fx,fy:me.fy}); } }
+    sendMove(); } }
 
 // -- Mobile: naikkan chat bar + log saat keyboard virtual muncul --
 if (window.visualViewport) {
