@@ -634,6 +634,7 @@ let moveStopTimer = null; // debounce: track() 600ms setelah berhenti gerak
 let subscribed = false; // true hanya saat channel benar-benar SUBSCRIBED
 let socket = null; // Socket.io — movement realtime, terpisah dari Supabase
 let watchdogInterval = null, lastPresenceSuccess = 0; // deteksi Supabase channel yang mati diam-diam
+const evictedIds = new Map(); // id -> timestamp; cegah presence sync basi nge-resurrect player yang baru ganti room
 
 function initOnline() {
   statusLabel = 'Connecting'; updateCount();
@@ -662,7 +663,7 @@ function startRealtime() {
       if (!o.posSet) { o.fx = data.tx; o.fy = data.ty; o.posSet = true; } }
   });
   socket.on('change-room', (data) => {
-    if (data.newRoom !== currentRoomId) others.delete(data.id);
+    if (data.newRoom !== currentRoomId) { others.delete(data.id); evictedIds.set(data.id, performance.now()); }
   });
   setupChannel();
 }
@@ -683,10 +684,17 @@ function setupChannel() {
     if (ch !== channel) return; // event basi dari channel room lama, sudah diganti
     const st = ch.presenceState(); const live = new Set();
     Object.entries(st).forEach(([id,arr]) => { if(id===myId) return; const v=arr[0]; live.add(id);
-      if (!others.has(id)) others.set(id, newPlayer({id, name:v.name, av:v.av,
-        ...(v.fx != null ? {fx:v.fx, fy:v.fy, tx:v.fx, ty:v.fy, posSet:true} : {})}));
+      if (!others.has(id)) {
+        if (evictedIds.has(id)) {
+          if (performance.now() - evictedIds.get(id) < 5000) return; // masih cooldown, skip re-add
+          evictedIds.delete(id); // cooldown abis, izinkan re-add
+        }
+        others.set(id, newPlayer({id, name:v.name, av:v.av,
+          ...(v.fx != null ? {fx:v.fx, fy:v.fy, tx:v.fx, ty:v.fy, posSet:true} : {})}));
+      }
       else { const o=others.get(id); o.name=v.name; o.av=v.av; } });
     [...others.keys()].forEach(id => { if (!live.has(id)) others.delete(id); });
+    [...evictedIds.keys()].forEach(id => { if (!live.has(id)) evictedIds.delete(id); }); // presence udah konfirmasi id ini bener-bener absen
     if (Object.keys(st).length > 0) lastPresenceSuccess = performance.now();
     updateCount();
   });
