@@ -672,8 +672,7 @@ function setupChannel() {
     Object.entries(st).forEach(([id,arr]) => { if(id===myId) return; const v=arr[0]; live.add(id);
       if (!others.has(id)) others.set(id, newPlayer({id, name:v.name, av:v.av,
         ...(v.fx != null ? {fx:v.fx, fy:v.fy, tx:v.fx, ty:v.fy, posSet:true} : {})}));
-      else { const o=others.get(id); o.name=v.name; o.av=v.av;
-        if (v.fx != null) { o.fx=v.fx; o.fy=v.fy; o.tx=v.fx; o.ty=v.fy; o.posSet=true; } } });
+      else { const o=others.get(id); o.name=v.name; o.av=v.av; } });
     [...others.keys()].forEach(id => { if (!live.has(id)) others.delete(id); });
     updateCount();
   });
