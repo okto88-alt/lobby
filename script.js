@@ -96,7 +96,7 @@ const ROOMS = {
       {gx:4.5,gy:7.5,kind:'table'},
       {gx:8,  gy:8,  kind:'lamp'},
     ],
-    neighbors:{up:null,down:null,left:'lobby',right:null},
+    neighbors:{up:null,down:null,left:'lobby',right:'casino'},
   },
   office: {
     name:'Office', grid:{w:10,h:10},
@@ -139,6 +139,20 @@ const ROOMS = {
     ],
     neighbors:{up:null,down:null,left:'office',right:null},
   },
+  casino: {
+    name:'Casino', grid:{w:18,h:16},
+    palette:{floor:'#8B1a1a',floor2:'#7a1515',wallL:'#8B6914',wallR:'#7a5a10'},
+    windows:[],
+    furniture:[
+      {gx:5,  gy:6,  kind:'roulette_table'},{gx:12,gy:6,  kind:'roulette_table'},
+      {gx:3,  gy:3,  kind:'card_table'},{gx:15, gy:3,  kind:'card_table'},{gx:8.5,gy:11, kind:'card_table'},
+      {gx:16, gy:2,  kind:'slot_machine'},{gx:16,gy:6,  kind:'slot_machine'},
+      {gx:16, gy:10, kind:'slot_machine'},{gx:16,gy:14, kind:'slot_machine'},
+      {gx:8.5,gy:1,  kind:'casino_bar'},
+      {gx:2,  gy:1,  kind:'dealer_sign'},{gx:15,gy:14, kind:'dealer_sign'},
+    ],
+    neighbors:{up:null,down:null,left:'gameroom',right:null},
+  },
 };
 const FRAMES = {
   lobby:    [ {gy:2, wall:'left', img:'assets/lobby-1.webp',   frame:'gold'},
@@ -157,8 +171,10 @@ const FRAMES = {
               {gy:15, wall:'top',  img:'assets/stadium-2.webp', frame:'metal'} ],
   beach:    [ {gy:2, wall:'left', img:'assets/beach-1.webp', frame:'wood'},
               {gy:8, wall:'top',  img:'assets/beach-2.webp', frame:'wood'} ],
+  casino:   [ {gy:2,  wall:'left', img:'assets/casino-1.webp', frame:'gold'},
+              {gy:9,  wall:'top',  img:'assets/casino-2.webp', frame:'gold'} ],
 };
-const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0' };
+const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0', casino:'#8B1a1a' };
 const FRAME_STYLES = {
   gold:  {border:'#c8a020', thick:4, mat:'#fff6ec'},
   metal: {border:'#aaaaaa', thick:2, mat:null},
@@ -516,6 +532,7 @@ function drawFloor() {
   wins.forEach(w => { const p=iso(0,w.gy); drawWindow(p.x,p.y-H+6); });
   drawRoomFrames();
   if (currentRoomId==='stadium') drawStadiumField();
+  if (currentRoomId==='casino') drawCasinoDecor();
 }
 // -- Beach: gelombang + kilau pasir, dianimasikan tiap frame di render() bukan di-bake ke bgCanvas --
 const BEACH_SPARKLES = [[3,3],[7,5],[11,2],[5,9],[14,7],[9,11],[2,10],[16,10]]; // posisi tetap, cuma opacity yang goyang
@@ -583,6 +600,20 @@ function drawStadiumField() {
   ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 7); ctx.fillStyle='rgba(255,255,255,.7)'; ctx.fill();
   const a=iso(9.5,0), b=iso(9.5,GH-0.1); // garis tengah lapangan
   ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  ctx.restore();
+}
+function drawCasinoDecor() {
+  ctx.save(); ctx.globalAlpha = 0.18; ctx.fillStyle = '#5a0f0f';
+  for (let gy=1; gy<GH-1; gy+=2) for (let gx=1; gx<GW-1; gx+=2) {
+    const s = iso(gx, gy);
+    ctx.beginPath(); ctx.moveTo(s.x, s.y-6); ctx.lineTo(s.x+10, s.y+2);
+    ctx.lineTo(s.x, s.y+10); ctx.lineTo(s.x-10, s.y+2); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  ctx.save(); ctx.strokeStyle = '#c8a020'; ctx.lineWidth = 3;
+  const top = iso(0,0), right = iso(GW,0), bottom = iso(GW,GH), left = iso(0,GH);
+  ctx.beginPath(); ctx.moveTo(top.x,top.y); ctx.lineTo(right.x,right.y);
+  ctx.lineTo(bottom.x,bottom.y); ctx.lineTo(left.x,left.y); ctx.closePath(); ctx.stroke();
   ctx.restore();
 }
 function drawWindow(x,y) { ctx.save(); ctx.fillStyle='#bfe6ff'; ctx.fillRect(x-2,y,30,28);
@@ -851,6 +882,38 @@ function drawFurniture(f) { const s=iso(f.gx,f.gy);
     ctx.fillRect(s.x-10,s.y-15,20,15); ctx.strokeRect(s.x-10,s.y-15,20,15);
     ctx.strokeStyle='#7a8890'; ctx.lineWidth=2.5;
     ctx.beginPath(); ctx.moveTo(s.x-5,s.y-15); ctx.lineTo(s.x-5,s.y-23); ctx.lineTo(s.x+5,s.y-23); ctx.lineTo(s.x+5,s.y-15); ctx.stroke(); }
+  if (f.kind==='roulette_table') {
+    ctx.fillStyle='#1a6b1a'; ctx.strokeStyle='#c8a020'; ctx.lineWidth=2.5;
+    ctx.beginPath(); ctx.ellipse(s.x,s.y,28,16,0,0,7); ctx.fill(); ctx.stroke();
+    const segCols=['#c8302a','#1a1a1a'];
+    for (let i=0;i<8;i++) { ctx.fillStyle=segCols[i%2];
+      ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.arc(s.x,s.y,8,i*Math.PI/4,(i+1)*Math.PI/4); ctx.closePath(); ctx.fill(); }
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1; ctx.beginPath(); ctx.arc(s.x,s.y,8,0,7); ctx.stroke();
+    ctx.fillStyle='#c8a020'; ctx.beginPath(); ctx.arc(s.x,s.y,2,0,7); ctx.fill(); }
+  if (f.kind==='card_table') {
+    ctx.fillStyle='#1a5a1a'; ctx.strokeStyle='#c8a020'; ctx.lineWidth=2.5;
+    ctx.fillRect(s.x-15,s.y-8,30,16); ctx.strokeRect(s.x-15,s.y-8,30,16);
+    ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.arc(s.x,s.y,10,Math.PI*0.1,Math.PI*0.9); ctx.stroke(); }
+  if (f.kind==='slot_machine') {
+    ctx.fillStyle='#c8302a'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-6,s.y-20,12,20); ctx.strokeRect(s.x-6,s.y-20,12,20);
+    ctx.fillStyle='#1a1a1a'; ctx.fillRect(s.x-5,s.y-17,10,7); ctx.strokeRect(s.x-5,s.y-17,10,7);
+    const symCols=['#ffd23f','#5bc4e8','#ff5ea8'];
+    [-4,0,4].forEach((dx,i)=>{ ctx.fillStyle=symCols[i]; ctx.fillRect(s.x+dx-1,s.y-15,2,3); });
+    ctx.strokeStyle='#8a8a8a'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(s.x+6,s.y-14); ctx.lineTo(s.x+11,s.y-18); ctx.stroke();
+    ctx.fillStyle='#c8302a'; ctx.beginPath(); ctx.arc(s.x+11,s.y-19,2,0,7); ctx.fill(); }
+  if (f.kind==='casino_bar') {
+    ctx.fillStyle='#3a1a08'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-18,s.y-4,36,8); ctx.strokeRect(s.x-18,s.y-4,36,8);
+    const cols=['#5bc4e8','#ffd23f','#ff5ea8','#8fd9b6'];
+    [-13,-5,3,11].forEach((dx,i)=>{ ctx.fillStyle=cols[i]; ctx.fillRect(s.x+dx,s.y-9,3,5); }); }
+  if (f.kind==='dealer_sign') {
+    ctx.fillStyle='#1a1a1a'; ctx.strokeStyle='#c8a020'; ctx.lineWidth=2.5;
+    ctx.fillRect(s.x-24,s.y-30,48,16); ctx.strokeRect(s.x-24,s.y-30,48,16);
+    ctx.fillStyle='#ffd23f'; ctx.font='11px VT323'; ctx.textAlign='center';
+    ctx.fillText('CASINO', s.x, s.y-19); }
 }
 // -- Stadium NPC: random walker lokal, gak sync network --
 const STADIUM_NPC_NAMES = ['Budi','Sari','Deni','Rini','Agus','Dewi','Hendra','Putri'];
@@ -957,6 +1020,30 @@ function updateBeachNPCs(dt, now) {
     const dx=n.tx-n.fx, dy=n.ty-n.fy, d=Math.hypot(dx,dy);
     if (d>0.05) { const k=Math.min(1,(n.speed*dt)/d); n.fx+=dx*k; n.fy+=dy*k; n.face=dx>=0?1:-1; }
     else { n.tx=3+Math.random()*12; n.ty=3+Math.random()*8; n.pauseT=now+3000+Math.random()*3000; }
+  });
+}
+// -- Casino NPC: sama polanya, gerak antar meja dengan jeda medium (2-4s) --
+const CASINO_NPC_NAMES = ['Dealer','Lucky','Jackpot','Chips','Ace','Joker'];
+const CASINO_SHIRTS = ['#2a2a3a','#1a2a4a','#3a1a1a','#241a3a'];
+const casinoNPCs = CASINO_NPC_NAMES.map(name => ({
+  fx: 2+Math.random()*14, fy: 2+Math.random()*12,
+  tx: 2+Math.random()*14, ty: 2+Math.random()*12,
+  speed: 0.8, name, pauseT: 0, face: 1,
+  av: {
+    skin: SKINS[Math.floor(Math.random()*SKINS.length)],
+    hairColor: HAIRC[Math.floor(Math.random()*HAIRC.length)],
+    hair: _npcHair[Math.floor(Math.random()*_npcHair.length)],
+    shirt: CASINO_SHIRTS[Math.floor(Math.random()*CASINO_SHIRTS.length)],
+    top: 'shirt',
+    acc: 'none',
+  },
+}));
+function updateCasinoNPCs(dt, now) {
+  casinoNPCs.forEach(n => {
+    if (n.pauseT > now) return;
+    const dx=n.tx-n.fx, dy=n.ty-n.fy, d=Math.hypot(dx,dy);
+    if (d>0.05) { const k=Math.min(1,(n.speed*dt)/d); n.fx+=dx*k; n.fy+=dy*k; n.face=dx>=0?1:-1; }
+    else { n.tx=2+Math.random()*14; n.ty=2+Math.random()*12; n.pauseT=now+2000+Math.random()*2000; }
   });
 }
 function drawDoorLabels() {
@@ -1101,6 +1188,7 @@ function update(dt, t) {
   checkDoorZone();
   if (currentRoomId==='stadium') { updateStadiumNPCs(dt, t); updateStadiumBall(dt, t); }
   if (currentRoomId==='beach') updateBeachNPCs(dt, t);
+  if (currentRoomId==='casino') updateCasinoNPCs(dt, t);
   for (let i=parts.length-1; i>=0; i--) { const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.life-=dt*0.6;
     if (p.life<=0) parts.splice(i,1); }
 }
@@ -1116,6 +1204,7 @@ function render(t) {
   others.forEach(o => ents.push({d:depthOf(o.fx,o.fy), draw:()=>drawAvatar(o,t)}));
   if (currentRoomId==='stadium') stadiumNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='beach') beachNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
+  if (currentRoomId==='casino') casinoNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='stadium') ents.push({d:depthOf(stadiumBall.fx,stadiumBall.fy)-.01, draw:()=>drawBall(stadiumBall)});
   ents.sort((a,b) => a.d-b.d).forEach(e => e.draw());
   drawAmbient(t);
@@ -1133,7 +1222,16 @@ function drawAmbient(t) {
     else if (f.kind==='tv')       drawTvFlicker(f, t);
     else if (f.kind==='computer') drawComputerGlow(f, t);
     else if (f.kind==='stove')    drawStoveShimmer(f, t);
+    else if (f.kind==='slot_machine') drawSlotFlash(f, t);
   });
+}
+function drawSlotFlash(f, t) {
+  const s = iso(f.gx, f.gy);
+  const on = Math.floor(t/400 + (f.gx+f.gy)) % 2 === 0;
+  ctx.save();
+  ctx.fillStyle = on ? '#ffd23f' : '#8a6800';
+  ctx.beginPath(); ctx.arc(s.x, s.y-21, 2.5, 0, 7); ctx.fill();
+  ctx.restore();
 }
 function drawFountainSpray(f, t) {
   const s = iso(f.gx, f.gy); const cx = s.x, cy = s.y - 16;
