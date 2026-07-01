@@ -69,7 +69,7 @@ const ROOMS = {
       {gx:4.5,gy:1.5,kind:'flowerbed'},{gx:2,gy:6,kind:'flowerbed'},{gx:7,gy:6,kind:'flowerbed'},
       {gx:2.5,gy:8,  kind:'bench'},{gx:6.5,gy:8,kind:'bench'},
     ],
-    neighbors:{up:null,down:null,left:null,right:'lobby'},
+    neighbors:{up:null,down:null,left:'stadium',right:'lobby'},
   },
   kitchen: {
     name:'Kitchen', grid:{w:10,h:10},
@@ -110,6 +110,20 @@ const ROOMS = {
     ],
     neighbors:{up:null,down:null,left:'gym',right:null},
   },
+  stadium: {
+    name:'Stadium', grid:{w:20,h:16},
+    palette:{floor:'#4a8a3a',floor2:'#3d7a2d',wallL:'#8a8a8a',wallR:'#7a7a7a'},
+    windows:[],
+    furniture:[
+      {gx:10,gy:2, kind:'goalpost'},{gx:10,gy:13,kind:'goalpost'},
+      {gx:2, gy:2, kind:'corner_flag'},{gx:18,gy:2, kind:'corner_flag'},
+      {gx:2, gy:13,kind:'corner_flag'},{gx:18,gy:13,kind:'corner_flag'},
+      {gx:1, gy:4, kind:'stadium_seat'},{gx:1, gy:11,kind:'stadium_seat'},
+      {gx:18,gy:4, kind:'stadium_seat'},{gx:18,gy:11,kind:'stadium_seat'},
+      {gx:10,gy:1, kind:'scoreboard'},
+    ],
+    neighbors:{up:null,down:null,left:null,right:'garden'},
+  },
 };
 const FRAMES = {
   lobby:    [ {gy:2, wall:'left', img:'assets/lobby-1.png',   frame:'gold'},
@@ -124,8 +138,10 @@ const FRAMES = {
               {gy:6, wall:'top',  img:'assets/game-2.png',    frame:'neon'} ],
   office:   [ {gy:2, wall:'left', img:'assets/office-1.png',  frame:'dark'},
               {gy:6, wall:'top',  img:'assets/office-2.png',  frame:'dark'} ],
+  stadium:  [ {gy:5,  wall:'left', img:'assets/stadium-1.png', frame:'metal'},
+              {gy:15, wall:'top',  img:'assets/stadium-2.png', frame:'metal'} ],
 };
-const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8' };
+const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a' };
 const FRAME_STYLES = {
   gold:  {border:'#c8a020', thick:4, mat:'#fff6ec'},
   metal: {border:'#aaaaaa', thick:2, mat:null},
@@ -482,6 +498,17 @@ function drawFloor() {
   const wins = getRoom().windows||[];
   wins.forEach(w => { const p=iso(0,w.gy); drawWindow(p.x,p.y-H+6); });
   drawRoomFrames();
+  if (currentRoomId==='stadium') drawStadiumField();
+}
+function drawStadiumField() {
+  const p = iso(9.5, 7.5); // titik tengah lapangan
+  ctx.save();
+  ctx.strokeStyle='rgba(255,255,255,.55)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.ellipse(p.x, p.y, 90, 45, 0, 0, Math.PI*2); ctx.stroke();
+  ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, 7); ctx.fillStyle='rgba(255,255,255,.7)'; ctx.fill();
+  const a=iso(9.5,0), b=iso(9.5,GH-0.1); // garis tengah lapangan
+  ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  ctx.restore();
 }
 function drawWindow(x,y) { ctx.save(); ctx.fillStyle='#bfe6ff'; ctx.fillRect(x-2,y,30,28);
   ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.strokeRect(x-2,y,30,28);
@@ -692,6 +719,116 @@ function drawFurniture(f) { const s=iso(f.gx,f.gy);
     const cols=['#ff8fab','#7fb3ff','#8fd9b6','#ffd23f','#c79bff'];
     [-40,-24,-8].forEach((rowY,ri) => { for (let i=0;i<5;i++) { ctx.fillStyle=cols[(i+ri)%cols.length];
       ctx.fillRect(s.x-12+i*5,s.y+rowY,4,12); } }); }
+  if (f.kind==='goalpost') {
+    ctx.strokeStyle='rgba(150,150,150,.5)'; ctx.lineWidth=1;
+    for (let i=-4;i<=4;i+=2) { ctx.beginPath(); ctx.moveTo(s.x+i,s.y+2); ctx.lineTo(s.x+i*0.5,s.y-10); ctx.stroke(); }
+    for (let j=-10;j<=2;j+=3) { ctx.beginPath(); ctx.moveTo(s.x-4,s.y+j); ctx.lineTo(s.x+4,s.y+j-3); ctx.stroke(); }
+    ctx.strokeStyle='#f5f5f5'; ctx.lineWidth=2.5; ctx.lineCap='round';
+    ctx.beginPath(); ctx.moveTo(s.x-4,s.y+2); ctx.lineTo(s.x-4,s.y-10); ctx.lineTo(s.x+4,s.y-10); ctx.lineTo(s.x+4,s.y+2); ctx.stroke();
+    ctx.lineCap='butt'; }
+  if (f.kind==='corner_flag') {
+    ctx.strokeStyle='#f5f5f5'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(s.x,s.y+2); ctx.lineTo(s.x,s.y-10); ctx.stroke();
+    ctx.fillStyle='#ffd23f';
+    ctx.beginPath(); ctx.moveTo(s.x,s.y-10); ctx.lineTo(s.x+6,s.y-8); ctx.lineTo(s.x,s.y-6); ctx.closePath(); ctx.fill(); }
+  if (f.kind==='stadium_seat') {
+    ctx.fillStyle='#6a6a6a'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-16,s.y-18,32,22); ctx.strokeRect(s.x-16,s.y-18,32,22);
+    const rowColors=['#e04040','#4070e0'];
+    for (let row=0; row<3; row++) for (let col=0; col<6; col++) {
+      ctx.fillStyle = rowColors[(row+col)%2];
+      ctx.beginPath(); ctx.arc(s.x-13+col*5, s.y-14+row*6, 1.8, 0, 7); ctx.fill();
+    } }
+  if (f.kind==='scoreboard') {
+    ctx.fillStyle='#1a1a1a'; ctx.strokeStyle='#ffd23f'; ctx.lineWidth=3;
+    ctx.fillRect(s.x-26,s.y-40,52,30); ctx.strokeRect(s.x-26,s.y-40,52,30);
+    ctx.fillStyle='#5bf05b'; ctx.font='9px VT323'; ctx.textAlign='center';
+    ctx.fillText('STADIUM', s.x, s.y-22);
+    ctx.font='7px VT323'; ctx.fillText('0 - 0', s.x, s.y-12); }
+}
+// -- Stadium NPC: random walker lokal, gak sync network --
+const STADIUM_NPC_NAMES = ['Budi','Sari','Deni','Rini','Agus','Dewi','Hendra','Putri'];
+const _npcHair = ['short','long','spiky'], _npcTops = ['plain','tee','shirt','hoodie'];
+const stadiumNPCs = STADIUM_NPC_NAMES.map((name,i) => ({
+  fx: 3+Math.random()*14, fy: 3+Math.random()*9,
+  tx: 3+Math.random()*14, ty: 3+Math.random()*9,
+  speed: 1.5+Math.random(), name, pauseT: 0, face: 1,
+  av: {
+    skin: SKINS[Math.floor(Math.random()*SKINS.length)],
+    hairColor: HAIRC[Math.floor(Math.random()*HAIRC.length)],
+    hair: _npcHair[Math.floor(Math.random()*_npcHair.length)],
+    shirt: SHIRTS[Math.floor(Math.random()*SHIRTS.length)],
+    top: _npcTops[Math.floor(Math.random()*_npcTops.length)],
+    acc: 'none',
+  },
+}));
+const stadiumBall = { fx:10, fy:8, tx:10, ty:8, speed:6, holder:0, targetIdx:null, nextPassAt:0 };
+function initStadiumBall() {
+  const now = performance.now();
+  stadiumBall.fx = stadiumBall.tx = 10;
+  stadiumBall.fy = stadiumBall.ty = 8;
+  stadiumBall.holder = Math.floor(Math.random()*stadiumNPCs.length);
+  stadiumBall.targetIdx = null;
+  stadiumBall.nextPassAt = now + 2000 + Math.random()*2000;
+}
+function updateStadiumNPCs(dt, now) {
+  stadiumNPCs.forEach(n => {
+    if (n.pauseT > now) return;
+    const dx=n.tx-n.fx, dy=n.ty-n.fy, d=Math.hypot(dx,dy);
+    if (d>0.05) { const k=Math.min(1,(n.speed*dt)/d); n.fx+=dx*k; n.fy+=dy*k; n.face=dx>=0?1:-1; }
+    else { n.tx=3+Math.random()*14; n.ty=3+Math.random()*9; n.pauseT=now+1000+Math.random()*2000; }
+  });
+}
+function updateStadiumBall(dt, now) {
+  const b = stadiumBall;
+  if (b.holder != null) {
+    const h = stadiumNPCs[b.holder];
+    b.fx = h.fx; b.fy = h.fy; // dribble: ikutin posisi holder
+    if (now >= b.nextPassAt) {
+      let idx; do { idx = Math.floor(Math.random()*stadiumNPCs.length); } while (idx === b.holder);
+      b.targetIdx = idx;
+      b.tx = stadiumNPCs[idx].fx; b.ty = stadiumNPCs[idx].fy;
+      b.holder = null; // lepas, bola melayang ke target
+    }
+    return;
+  }
+  if (b.targetIdx == null) { // gak ada holder & gak ada target -> otomatis cari NPC terdekat
+    let best=0, bestD=Infinity;
+    stadiumNPCs.forEach((n,i) => { const d=Math.hypot(n.fx-b.fx, n.fy-b.fy); if (d<bestD) { bestD=d; best=i; } });
+    b.targetIdx = best;
+    b.tx = stadiumNPCs[best].fx; b.ty = stadiumNPCs[best].fy;
+  }
+  const dx=b.tx-b.fx, dy=b.ty-b.fy, d=Math.hypot(dx,dy);
+  if (d>0.05) { const k=Math.min(1,(b.speed*dt)/d); b.fx+=dx*k; b.fy+=dy*k; }
+  const target = stadiumNPCs[b.targetIdx];
+  if (Math.hypot(target.fx-b.fx, target.fy-b.fy) < 1.5) {
+    b.holder = b.targetIdx; b.targetIdx = null;
+    b.nextPassAt = now + 2000 + Math.random()*2000;
+  }
+}
+function drawNPC(n) {
+  const s = iso(n.fx, n.fy);
+  ctx.save(); ctx.translate(s.x, s.y); ctx.scale(1.15,1.15); drawChar(ctx, n.av, n.face); ctx.restore();
+  // nametag, sama kayak player
+  ctx.font='15px VT323'; ctx.textAlign='center';
+  const tw = ctx.measureText(n.name).width + 12;
+  rr(ctx, s.x-tw/2, s.y-58, tw, 16, 6, 'rgba(43,38,64,.85)');
+  ctx.fillStyle='#fff'; ctx.fillText(n.name, s.x, s.y-46);
+}
+function drawBall(b) {
+  let bx=b.fx, by=b.fy;
+  if (b.holder != null) { const h=stadiumNPCs[b.holder]; bx=h.fx+(h.face||1)*0.3; by=h.fy; }
+  const s = iso(bx, by);
+  ctx.save();
+  ctx.fillStyle='#fff'; ctx.strokeStyle=C.ink; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.arc(s.x, s.y, 4, 0, 7); ctx.fill(); ctx.stroke();
+  ctx.fillStyle='#1a1a1a';
+  ctx.beginPath();
+  for (let i=0;i<5;i++) { const a=-Math.PI/2+i*(Math.PI*2/5), r=2;
+    const px=s.x+Math.cos(a)*r, py=s.y+Math.sin(a)*r;
+    i===0 ? ctx.moveTo(px,py) : ctx.lineTo(px,py); }
+  ctx.closePath(); ctx.fill();
+  ctx.restore();
 }
 function drawDoorLabels() {
   const nb = getRoom().neighbors; const H = 46;
@@ -833,6 +970,7 @@ function update(dt, t) {
   if (me) moveToward(me, dt); others.forEach(o => moveToward(o,dt));
   if (ONLINE && me) maybeSendMove();
   checkDoorZone();
+  if (currentRoomId==='stadium') { updateStadiumNPCs(dt, t); updateStadiumBall(dt, t); }
   for (let i=parts.length-1; i>=0; i--) { const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.life-=dt*0.6;
     if (p.life<=0) parts.splice(i,1); }
 }
@@ -845,6 +983,8 @@ function render(t) {
   getRoom().furniture.forEach(f => ents.push({d:depthOf(f.gx,f.gy), draw:()=>drawFurniture(f)}));
   if (me) ents.push({d:depthOf(me.fx,me.fy)+.01, draw:()=>drawAvatar(me,t)});
   others.forEach(o => ents.push({d:depthOf(o.fx,o.fy), draw:()=>drawAvatar(o,t)}));
+  if (currentRoomId==='stadium') stadiumNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
+  if (currentRoomId==='stadium') ents.push({d:depthOf(stadiumBall.fx,stadiumBall.fy)-.01, draw:()=>drawBall(stadiumBall)});
   ents.sort((a,b) => a.d-b.d).forEach(e => e.draw());
   drawAmbient(t);
 
@@ -1092,6 +1232,7 @@ async function enterRoom(roomId, fromSide) {
   fadeTransition(true);
   doorArmed = false;
   currentRoomId = roomId;
+  if (roomId === 'stadium') initStadiumBall();
   const r = getRoom();
   GW = r.grid.w; GH = r.grid.h;
   const cx = r.grid.w/2 - 0.5, cy = r.grid.h/2 - 0.5;
