@@ -83,7 +83,7 @@ const ROOMS = {
       {gx:4.5,gy:6,kind:'table'},
       {gx:3,gy:6,kind:'bench'},{gx:6,gy:6,kind:'bench'},
     ],
-    neighbors:{up:null,down:null,left:null,right:'gym'},
+    neighbors:{up:'rooftop',down:null,left:null,right:'gym'},
   },
   gameroom: {
     name:'Game Room', grid:{w:10,h:10},
@@ -153,6 +153,20 @@ const ROOMS = {
     ],
     neighbors:{up:null,down:null,left:'gameroom',right:null},
   },
+  rooftop: {
+    name:'Rooftop', grid:{w:16,h:14},
+    palette:{floor:'#4a4a5a',floor2:'#3a3a4a',wallL:'#1a1a2e',wallR:'#0f0f1e'},
+    windows:[],
+    furniture:[
+      {gx:3,  gy:8,  kind:'outdoor_sofa'},{gx:11, gy:8,  kind:'outdoor_sofa'},
+      {gx:5,  gy:5,  kind:'rooftop_table'},{gx:10, gy:5, kind:'rooftop_table'},
+      {gx:1,  gy:1,  kind:'planter'},{gx:14, gy:1, kind:'planter'},{gx:7.5,gy:12, kind:'planter'},
+      {gx:2,  gy:11, kind:'water_tower'},{gx:13, gy:11, kind:'water_tower'},
+      {gx:4,  gy:6.5,kind:'string_lights'},{gx:11,gy:6.5, kind:'string_lights'},
+      {gx:4,  gy:0.5, kind:'city_view'},{gx:12, gy:0.5, kind:'city_view'},
+    ],
+    neighbors:{up:null,down:'kitchen',left:null,right:null},
+  },
 };
 const FRAMES = {
   lobby:    [ {gy:2, wall:'left', img:'assets/lobby-1.webp',   frame:'gold'},
@@ -173,8 +187,10 @@ const FRAMES = {
               {gy:8, wall:'top',  img:'assets/beach-2.webp', frame:'wood'} ],
   casino:   [ {gy:2,  wall:'left', img:'assets/casino-1.webp', frame:'gold'},
               {gy:9,  wall:'top',  img:'assets/casino-2.webp', frame:'gold'} ],
+  rooftop:  [ {gy:2, wall:'left', img:'assets/rooftop-1.webp', frame:'dark'},
+              {gy:6, wall:'top',  img:'assets/rooftop-2.webp', frame:'dark'} ],
 };
-const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0', casino:'#8B1a1a' };
+const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0', casino:'#8B1a1a', rooftop:'#1a1a2e' };
 const FRAME_STYLES = {
   gold:  {border:'#c8a020', thick:4, mat:'#fff6ec'},
   metal: {border:'#aaaaaa', thick:2, mat:null},
@@ -533,6 +549,7 @@ function drawFloor() {
   drawRoomFrames();
   if (currentRoomId==='stadium') drawStadiumField();
   if (currentRoomId==='casino') drawCasinoDecor();
+  if (currentRoomId==='rooftop') drawRooftopDecor();
 }
 // -- Beach: gelombang + kilau pasir, dianimasikan tiap frame di render() bukan di-bake ke bgCanvas --
 const BEACH_SPARKLES = [[3,3],[7,5],[11,2],[5,9],[14,7],[9,11],[2,10],[16,10]]; // posisi tetap, cuma opacity yang goyang
@@ -614,6 +631,22 @@ function drawCasinoDecor() {
   const top = iso(0,0), right = iso(GW,0), bottom = iso(GW,GH), left = iso(0,GH);
   ctx.beginPath(); ctx.moveTo(top.x,top.y); ctx.lineTo(right.x,right.y);
   ctx.lineTo(bottom.x,bottom.y); ctx.lineTo(left.x,left.y); ctx.closePath(); ctx.stroke();
+  ctx.restore();
+}
+function drawRooftopDecor() {
+  const H = 46;
+  ctx.save(); ctx.strokeStyle='rgba(0,0,0,.15)'; ctx.lineWidth=1;
+  for (let gx=2; gx<GW; gx+=2) { const a=iso(gx,0), b=iso(gx,GH);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+  for (let gy=2; gy<GH; gy+=2) { const a=iso(0,gy), b=iso(GW,gy);
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+  ctx.restore();
+  const p = iso(GW-1.5, 0);
+  ctx.save();
+  ctx.fillStyle = '#f0f0d8';
+  ctx.beginPath(); ctx.arc(p.x, p.y-H-20, 10, 0, 7); ctx.fill();
+  ctx.fillStyle = 'rgba(15,15,30,.55)';
+  ctx.beginPath(); ctx.arc(p.x+4, p.y-H-23, 9, 0, 7); ctx.fill();
   ctx.restore();
 }
 function drawWindow(x,y) { ctx.save(); ctx.fillStyle='#bfe6ff'; ctx.fillRect(x-2,y,30,28);
@@ -914,6 +947,52 @@ function drawFurniture(f) { const s=iso(f.gx,f.gy);
     ctx.fillRect(s.x-24,s.y-30,48,16); ctx.strokeRect(s.x-24,s.y-30,48,16);
     ctx.fillStyle='#ffd23f'; ctx.font='11px VT323'; ctx.textAlign='center';
     ctx.fillText('CASINO', s.x, s.y-19); }
+  if (f.kind==='outdoor_sofa') {
+    ctx.fillStyle='#7a7a8a'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-14,s.y-2,28,10); ctx.strokeRect(s.x-14,s.y-2,28,10);
+    ctx.fillStyle='#9a9aaa';
+    [-11,-1,9].forEach(dx => { ctx.fillRect(s.x+dx,s.y-6,8,6); ctx.strokeRect(s.x+dx,s.y-6,8,6); });
+    ctx.fillStyle='#2a2a3a';
+    [[-13,7],[11,7],[-13,-1],[11,-1]].forEach(([dx,dy]) => ctx.fillRect(s.x+dx,s.y+dy,3,4)); }
+  if (f.kind==='string_lights') {
+    const y = s.y-40, xs=s.x-20, xe=s.x+20;
+    ctx.strokeStyle='rgba(40,30,20,.7)'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(xs,y); ctx.quadraticCurveTo(s.x,y+6,xe,y); ctx.stroke();
+    for (let i=0;i<9;i++) { const t=i/8, bx=xs+(xe-xs)*t, by=y+6*Math.sin(Math.PI*t);
+      ctx.save(); ctx.shadowColor='#ffdd88'; ctx.shadowBlur=6;
+      ctx.fillStyle='#ffdd88'; ctx.beginPath(); ctx.arc(bx,by+2,2,0,7); ctx.fill(); ctx.restore(); } }
+  if (f.kind==='rooftop_table') {
+    ctx.fillStyle='#3a3a3a'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.arc(s.x,s.y,10,0,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='rgba(180,220,255,.55)';
+    ctx.beginPath(); ctx.arc(s.x,s.y,7,0,7); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,.4)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.fillStyle='#4a4a5a'; ctx.strokeStyle=C.ink; ctx.lineWidth=1.5;
+    [[-16,4],[16,4]].forEach(([dx,dy]) => { ctx.beginPath(); ctx.arc(s.x+dx,s.y+dy,4,0,7); ctx.fill(); ctx.stroke(); }); }
+  if (f.kind==='planter') {
+    ctx.fillStyle='#3a3a3a'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-8,s.y,16,8); ctx.strokeRect(s.x-8,s.y,16,8);
+    ctx.fillStyle='#3f8a4a';
+    ctx.beginPath(); ctx.ellipse(s.x,s.y-4,10,8,0,0,7); ctx.fill();
+    const cols=['#ff6b81','#ffd23f','#ff6b6b'];
+    [[-4,-6],[3,-4],[-1,-8]].forEach(([dx,dy],i) => { ctx.fillStyle=cols[i]; ctx.beginPath(); ctx.arc(s.x+dx,s.y+dy,2,0,7); ctx.fill(); }); }
+  if (f.kind==='water_tower') {
+    ctx.fillStyle='#4a3a2a'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.fillRect(s.x-12,s.y-30,24,26); ctx.strokeRect(s.x-12,s.y-30,24,26);
+    ctx.beginPath(); ctx.ellipse(s.x,s.y-30,12,5,0,0,7); ctx.fill(); ctx.stroke();
+    ctx.strokeStyle='#2a1a10'; ctx.lineWidth=1.5;
+    ctx.beginPath(); ctx.moveTo(s.x-6,s.y-4); ctx.lineTo(s.x-9,s.y+8); ctx.moveTo(s.x+6,s.y-4); ctx.lineTo(s.x+9,s.y+8); ctx.stroke(); }
+  if (f.kind==='city_view') {
+    const H=46, baseY = s.y - H;
+    const buildings = [[-26,30,'#12121f'],[-10,42,'#181828'],[6,26,'#0d0d18'],[22,36,'#151522']];
+    buildings.forEach(([dx,h,col],bi) => {
+      ctx.fillStyle = col; ctx.fillRect(s.x+dx, baseY-h, 14, h);
+      ctx.fillStyle = '#ffd23f';
+      for (let wy=6; wy<h-6; wy+=9) for (let wx=3; wx<10; wx+=6) {
+        if ((wx+wy+bi)%5!==0) continue;
+        ctx.fillRect(s.x+dx+wx, baseY-h+wy, 2, 3);
+      }
+    }); }
 }
 // -- Stadium NPC: random walker lokal, gak sync network --
 const STADIUM_NPC_NAMES = ['Budi','Sari','Deni','Rini','Agus','Dewi','Hendra','Putri'];
@@ -1045,6 +1124,46 @@ function updateCasinoNPCs(dt, now) {
     if (d>0.05) { const k=Math.min(1,(n.speed*dt)/d); n.fx+=dx*k; n.fy+=dy*k; n.face=dx>=0?1:-1; }
     else { n.tx=2+Math.random()*14; n.ty=2+Math.random()*12; n.pauseT=now+2000+Math.random()*2000; }
   });
+}
+// -- Rooftop NPC: santai, jalan pelan sambil nikmatin pemandangan --
+const ROOFTOP_NPC_NAMES = ['Sky','Bintang','Malam','Angin','Langit'];
+const rooftopNPCs = ROOFTOP_NPC_NAMES.map(name => ({
+  fx: 2+Math.random()*12, fy: 2+Math.random()*10,
+  tx: 2+Math.random()*12, ty: 2+Math.random()*10,
+  speed: 0.5, name, pauseT: 0, face: 1,
+  av: {
+    skin: SKINS[Math.floor(Math.random()*SKINS.length)],
+    hairColor: HAIRC[Math.floor(Math.random()*HAIRC.length)],
+    hair: _npcHair[Math.floor(Math.random()*_npcHair.length)],
+    shirt: SHIRTS[Math.floor(Math.random()*SHIRTS.length)],
+    top: _npcTops[Math.floor(Math.random()*_npcTops.length)],
+    acc: 'none',
+  },
+}));
+function updateRooftopNPCs(dt, now) {
+  rooftopNPCs.forEach(n => {
+    if (n.pauseT > now) return;
+    const dx=n.tx-n.fx, dy=n.ty-n.fy, d=Math.hypot(dx,dy);
+    if (d>0.05) { const k=Math.min(1,(n.speed*dt)/d); n.fx+=dx*k; n.fy+=dy*k; n.face=dx>=0?1:-1; }
+    else { n.tx=2+Math.random()*12; n.ty=2+Math.random()*10; n.pauseT=now+4000+Math.random()*3000; }
+  });
+}
+const ROOFTOP_STARS = [
+  {wall:'top',  gx:1,  h:38},{wall:'top',  gx:4,  h:20},{wall:'top', gx:7,  h:34},
+  {wall:'top',  gx:10, h:15},{wall:'top',  gx:13, h:28},
+  {wall:'left', gy:2,  h:32},{wall:'left', gy:5,  h:18},{wall:'left', gy:8,  h:36},
+  {wall:'left', gy:11, h:22},
+];
+function drawRooftopStars(t) {
+  ctx.save();
+  ROOFTOP_STARS.forEach((st, i) => {
+    const a = st.wall==='top' ? iso(st.gx, 0) : iso(0, st.gy);
+    const x = a.x, y = a.y - st.h;
+    ctx.globalAlpha = 0.4 + 0.6*Math.abs(Math.sin(t/600 + i*1.3));
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(x, y, 1.4, 0, 7); ctx.fill();
+  });
+  ctx.restore();
 }
 function drawDoorLabels() {
   const nb = getRoom().neighbors; const H = 46;
@@ -1189,6 +1308,7 @@ function update(dt, t) {
   if (currentRoomId==='stadium') { updateStadiumNPCs(dt, t); updateStadiumBall(dt, t); }
   if (currentRoomId==='beach') updateBeachNPCs(dt, t);
   if (currentRoomId==='casino') updateCasinoNPCs(dt, t);
+  if (currentRoomId==='rooftop') updateRooftopNPCs(dt, t);
   for (let i=parts.length-1; i>=0; i--) { const p=parts[i]; p.x+=p.vx; p.y+=p.vy; p.life-=dt*0.6;
     if (p.life<=0) parts.splice(i,1); }
 }
@@ -1198,6 +1318,7 @@ function render(t) {
   // dw/dh = innerWidth/Height (logical): dengan transform DPR mengisi tepat cv.width x cv.height fisik
   ctx.drawImage(bgCanvas, 0, 0, innerWidth, innerHeight);
   if (currentRoomId==='beach') drawBeachDecor(ctx, t);
+  if (currentRoomId==='rooftop') drawRooftopStars(t);
   const ents = [];
   getRoom().furniture.forEach(f => ents.push({d:depthOf(f.gx,f.gy), draw:()=>drawFurniture(f)}));
   if (me) ents.push({d:depthOf(me.fx,me.fy)+.01, draw:()=>drawAvatar(me,t)});
@@ -1205,6 +1326,7 @@ function render(t) {
   if (currentRoomId==='stadium') stadiumNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='beach') beachNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='casino') casinoNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
+  if (currentRoomId==='rooftop') rooftopNPCs.forEach(n => ents.push({d:depthOf(n.fx,n.fy), draw:()=>drawNPC(n)}));
   if (currentRoomId==='stadium') ents.push({d:depthOf(stadiumBall.fx,stadiumBall.fy)-.01, draw:()=>drawBall(stadiumBall)});
   ents.sort((a,b) => a.d-b.d).forEach(e => e.draw());
   drawAmbient(t);
@@ -1223,6 +1345,7 @@ function drawAmbient(t) {
     else if (f.kind==='computer') drawComputerGlow(f, t);
     else if (f.kind==='stove')    drawStoveShimmer(f, t);
     else if (f.kind==='slot_machine') drawSlotFlash(f, t);
+    else if (f.kind==='string_lights') drawStringLightsPulse(f, t);
   });
 }
 function drawSlotFlash(f, t) {
@@ -1232,6 +1355,17 @@ function drawSlotFlash(f, t) {
   ctx.fillStyle = on ? '#ffd23f' : '#8a6800';
   ctx.beginPath(); ctx.arc(s.x, s.y-21, 2.5, 0, 7); ctx.fill();
   ctx.restore();
+}
+function drawStringLightsPulse(f, t) {
+  const s = iso(f.gx, f.gy);
+  const y = s.y-40, xs=s.x-20, xe=s.x+20;
+  for (let i=0;i<9;i++) { const tt=i/8, bx=xs+(xe-xs)*tt, by=y+6*Math.sin(Math.PI*tt);
+    const pulse = 0.5+0.5*Math.sin(t/300 + i*0.9);
+    ctx.save(); ctx.globalAlpha = 0.5+pulse*0.5;
+    ctx.shadowColor='#ffdd88'; ctx.shadowBlur=4+pulse*6;
+    ctx.fillStyle='#ffdd88'; ctx.beginPath(); ctx.arc(bx,by+2,2,0,7); ctx.fill();
+    ctx.restore();
+  }
 }
 function drawFountainSpray(f, t) {
   const s = iso(f.gx, f.gy); const cx = s.x, cy = s.y - 16;
