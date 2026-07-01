@@ -630,6 +630,7 @@ function demoReply() { const arr=[...others.values()]; if (!arr.length) return;
 // ============================================================
 let channel=null, sb=null, statusLabel='Online', lastMoveSent=0, lastX=null, lastY=null;
 let _reconnecting = false; // guard biar tidak dobel channel saat error beruntun
+let moveStopTimer = null; // debounce: track() 600ms setelah berhenti gerak
 
 function initOnline() {
   statusLabel = 'Connecting'; updateCount();
@@ -763,7 +764,10 @@ async function enterRoom(roomId, fromSide) {
 function sendMove() { if(channel) channel.send({type:'broadcast',event:'move',payload:{id:myId,tx:me.tx,ty:me.ty}}); }
 function maybeSendMove() { const now=performance.now();
   if (now-lastMoveSent>120 && (me.tx!==lastX || me.ty!==lastY)) { lastMoveSent=now; lastX=me.tx; lastY=me.ty;
-    sendMove(); } }
+    sendMove();
+    clearTimeout(moveStopTimer);
+    moveStopTimer = setTimeout(() => { if (channel) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}); }, 600);
+  } }
 
 // -- Mobile: naikkan chat bar + log saat keyboard virtual muncul --
 if (window.visualViewport) {
