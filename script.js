@@ -44,7 +44,7 @@ const ROOMS = {
       {gx:1,gy:1,kind:'plant'},{gx:8,gy:1,kind:'lamp'},
       {gx:4.5,gy:2,kind:'table'},{gx:8,gy:8,kind:'plant'},{gx:1,gy:8,kind:'table'},
     ],
-    neighbors:{up:'gym',down:null,left:null,right:null},
+    neighbors:{up:'gym',down:null,left:'garden',right:null},
   },
   gym: {
     name:'Gym', grid:{w:10,h:10},
@@ -57,6 +57,19 @@ const ROOMS = {
       {gx:1,  gy:8,  kind:'mirror'},{gx:8,  gy:8,kind:'cooler'},
     ],
     neighbors:{up:null,down:'lobby',left:null,right:null},
+  },
+  garden: {
+    name:'Garden', grid:{w:10,h:10},
+    palette:{floor:'#c8d89a',floor2:'#b8c88a',wallL:'#6a8a4a',wallR:'#5a7a3a'},
+    windows:[],
+    furniture:[
+      {gx:4.5,gy:4.5,kind:'fountain'},
+      {gx:1,  gy:1,  kind:'tree'},{gx:8,gy:1,kind:'tree'},
+      {gx:1,  gy:8,  kind:'tree'},{gx:8,gy:8,kind:'tree'},
+      {gx:4.5,gy:1.5,kind:'flowerbed'},{gx:2,gy:6,kind:'flowerbed'},{gx:7,gy:6,kind:'flowerbed'},
+      {gx:2.5,gy:8,  kind:'bench'},{gx:6.5,gy:8,kind:'bench'},
+    ],
+    neighbors:{up:null,down:null,left:null,right:'lobby'},
   },
 };
 let currentRoomId = 'lobby';
@@ -440,6 +453,29 @@ function drawFurniture(f) { const s=iso(f.gx,f.gy);
     ctx.beginPath(); ctx.ellipse(s.x,s.y-28,6,8,0,0,7); ctx.stroke();
     ctx.fillStyle='#5bc4e8'; ctx.strokeStyle=C.ink; ctx.lineWidth=1;
     ctx.fillRect(s.x-3,s.y-2,6,4); ctx.strokeRect(s.x-3,s.y-2,6,4); }
+  if (f.kind==='fountain') {
+    ctx.fillStyle='#9fa8b0'; ctx.strokeStyle=C.ink; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.ellipse(s.x,s.y+10,26,14,0,0,7); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#5bc4e8'; ctx.save(); ctx.globalAlpha=0.85;
+    ctx.beginPath(); ctx.ellipse(s.x,s.y+8,20,10,0,0,7); ctx.fill(); ctx.restore();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5; ctx.beginPath(); ctx.ellipse(s.x,s.y+8,20,10,0,0,7); ctx.stroke();
+    ctx.fillStyle='#9fa8b0'; ctx.fillRect(s.x-4,s.y-14,8,22); ctx.strokeRect(s.x-4,s.y-14,8,22);
+    ctx.fillStyle='#bfe9f5'; ctx.save(); ctx.globalAlpha=0.9;
+    ctx.beginPath(); ctx.ellipse(s.x,s.y-16,9,7,0,0,7); ctx.fill(); ctx.restore();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5; ctx.beginPath(); ctx.ellipse(s.x,s.y-16,9,7,0,0,7); ctx.stroke(); }
+  if (f.kind==='flowerbed') {
+    ctx.save(); ctx.globalAlpha=.9;
+    ctx.beginPath(); ctx.ellipse(s.x,s.y+TH/2,TW*0.55,TH*0.55,0,0,7); ctx.fillStyle='#3f8a4a'; ctx.fill();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=1.5; ctx.stroke();
+    [['#ff6b81',-14,-3],['#ffd23f',-2,4],['#ff6b6b',10,-4],['#ffd23f',-8,8],['#ff6b81',6,6],['#fff275',0,-8]]
+      .forEach(([c,dx,dy]) => { ctx.fillStyle=c; ctx.beginPath(); ctx.arc(s.x+dx, s.y+TH/2+dy, 3, 0, 7); ctx.fill(); });
+    ctx.restore(); }
+  if (f.kind==='tree') {
+    ctx.fillStyle='#7a5233'; ctx.fillRect(s.x-6,s.y+2,12,20);
+    ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.strokeRect(s.x-6,s.y+2,12,20);
+    ctx.fillStyle='#2f6b3a'; ctx.beginPath(); ctx.ellipse(s.x,s.y-16,24,26,0,0,7); ctx.fill();
+    ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.stroke();
+    ctx.fillStyle='#3f8a4a'; ctx.beginPath(); ctx.ellipse(s.x-8,s.y-22,12,14,0,0,7); ctx.fill(); }
 }
 function drawDoorLabels() {
   const nb = getRoom().neighbors; const H = 46;
