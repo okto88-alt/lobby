@@ -677,6 +677,7 @@ function setupChannel() {
   channel = ch;
 
   ch.on('presence', {event:'sync'}, () => {
+    if (ch !== channel) return; // event basi dari channel room lama, sudah diganti
     const st = ch.presenceState(); const live = new Set();
     Object.entries(st).forEach(([id,arr]) => { if(id===myId) return; const v=arr[0]; live.add(id);
       if (!others.has(id)) others.set(id, newPlayer({id, name:v.name, av:v.av,
@@ -686,9 +687,9 @@ function setupChannel() {
     if (Object.keys(st).length > 0) lastPresenceSuccess = performance.now();
     updateCount();
   });
-  ch.on('broadcast', {event:'chat'}, ({payload}) => { let o=others.get(payload.id);
+  ch.on('broadcast', {event:'chat'}, ({payload}) => { if (ch !== channel) return; let o=others.get(payload.id);
     if (o) { say(o, payload.text); } addLog(payload.name, payload.text, false); });
-  ch.on('broadcast', {event:'emote'}, ({payload}) => { const o=others.get(payload.id); if(o) spawnHearts(o); });
+  ch.on('broadcast', {event:'emote'}, ({payload}) => { if (ch !== channel) return; const o=others.get(payload.id); if(o) spawnHearts(o); });
 
   ch.subscribe(async st => {
     if (st === 'SUBSCRIBED') {
