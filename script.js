@@ -141,22 +141,22 @@ const ROOMS = {
   },
 };
 const FRAMES = {
-  lobby:    [ {gy:2, wall:'left', img:'assets/lobby-1.png',   frame:'gold'},
-              {gy:7, wall:'top',  img:'assets/lobby-2.png',   frame:'gold'} ], // gx:5 nabrak pintu lobby<->gym, dipindah ke 7
-  gym:      [ {gy:2, wall:'left', img:'assets/gym-1.png',     frame:'metal'},
-              {gy:6, wall:'top',  img:'assets/gym-2.png',     frame:'metal'} ],
-  garden:   [ {gy:2, wall:'left', img:'assets/garden-1.png',  frame:'wood'},
-              {gy:6, wall:'top',  img:'assets/garden-2.png',  frame:'wood'} ],
-  kitchen:  [ {gy:2, wall:'left', img:'assets/kitchen-1.png', frame:'white'},
-              {gy:6, wall:'top',  img:'assets/kitchen-2.png', frame:'white'} ],
-  gameroom: [ {gy:2, wall:'left', img:'assets/game-1.png',    frame:'neon'},
-              {gy:6, wall:'top',  img:'assets/game-2.png',    frame:'neon'} ],
-  office:   [ {gy:2, wall:'left', img:'assets/office-1.png',  frame:'dark'},
-              {gy:6, wall:'top',  img:'assets/office-2.png',  frame:'dark'} ],
-  stadium:  [ {gy:5,  wall:'left', img:'assets/stadium-1.png', frame:'metal'},
-              {gy:15, wall:'top',  img:'assets/stadium-2.png', frame:'metal'} ],
-  beach:    [ {gy:2, wall:'left', img:'assets/beach-1.png', frame:'wood'},
-              {gy:8, wall:'top',  img:'assets/beach-2.png', frame:'wood'} ],
+  lobby:    [ {gy:2, wall:'left', img:'assets/lobby-1.webp',   frame:'gold'},
+              {gy:7, wall:'top',  img:'assets/lobby-2.webp',   frame:'gold'} ], // gx:5 nabrak pintu lobby<->gym, dipindah ke 7
+  gym:      [ {gy:2, wall:'left', img:'assets/gym-1.webp',     frame:'metal'},
+              {gy:6, wall:'top',  img:'assets/gym-2.webp',     frame:'metal'} ],
+  garden:   [ {gy:2, wall:'left', img:'assets/garden-1.webp',  frame:'wood'},
+              {gy:6, wall:'top',  img:'assets/garden-2.webp',  frame:'wood'} ],
+  kitchen:  [ {gy:2, wall:'left', img:'assets/kitchen-1.webp', frame:'white'},
+              {gy:6, wall:'top',  img:'assets/kitchen-2.webp', frame:'white'} ],
+  gameroom: [ {gy:2, wall:'left', img:'assets/game-1.webp',    frame:'neon'},
+              {gy:6, wall:'top',  img:'assets/game-2.webp',    frame:'neon'} ],
+  office:   [ {gy:2, wall:'left', img:'assets/office-1.webp',  frame:'dark'},
+              {gy:6, wall:'top',  img:'assets/office-2.webp',  frame:'dark'} ],
+  stadium:  [ {gy:5,  wall:'left', img:'assets/stadium-1.webp', frame:'metal'},
+              {gy:15, wall:'top',  img:'assets/stadium-2.webp', frame:'metal'} ],
+  beach:    [ {gy:2, wall:'left', img:'assets/beach-1.webp', frame:'wood'},
+              {gy:8, wall:'top',  img:'assets/beach-2.webp', frame:'wood'} ],
 };
 const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8', stadium:'#6a9a5a', beach:'#f0d8a0' };
 const FRAME_STYLES = {
