@@ -612,6 +612,14 @@ function drawChar(c, av, face) {
   c.fillStyle='rgba(0,0,0,.18)'; c.beginPath(); c.ellipse(0,8,14,6,0,0,7); c.fill();
   c.fillStyle='#2b2640'; c.fillRect(-7,-6,5,8); c.fillRect(2,-6,5,8);          // kaki
 
+  // lengan + tangan (arms + hands, selalu pakai warna av.skin)
+  c.strokeStyle='#2b2640'; c.lineWidth=1.5;
+  rr(c,-12,-21,3,14,2,av.skin); c.stroke();
+  rr(c,9, -21,3,14,2,av.skin); c.stroke();
+  c.fillStyle=av.skin;
+  c.beginPath(); c.arc(-10.5,-5,2.5,0,7); c.fill(); c.stroke();
+  c.beginPath(); c.arc(10.5,-5,2.5,0,7);  c.fill(); c.stroke();
+
   // dress: rok menutup kaki (digambar sebelum badan)
   if (top==='dress') {
     c.beginPath(); c.moveTo(-10,-6); c.lineTo(10,-6); c.lineTo(16,9); c.lineTo(-16,9); c.closePath();
@@ -622,7 +630,7 @@ function drawChar(c, av, face) {
 
   // detail baju
   if (top==='tee') {
-    c.fillStyle=av.shirt; c.fillRect(-13,-22,4,8); c.fillRect(9,-22,4,8);
+    c.fillStyle='#fff6ec'; c.fillRect(-13,-22,4,8); c.fillRect(9,-22,4,8);
     c.strokeStyle='#2b2640'; c.lineWidth=1.5; c.strokeRect(-13,-22,4,8); c.strokeRect(9,-22,4,8);
     c.fillStyle='#fff6ec'; c.fillRect(-4,-24,8,2);
   } else if (top==='shirt') {
@@ -646,10 +654,10 @@ function drawChar(c, av, face) {
   rr(c,-9,-40,18,18,7,av.skin); c.strokeStyle='#2b2640'; c.lineWidth=2; c.stroke(); // kepala
   // rambut
   c.fillStyle = av.hairColor;
-  if (av.hair==='short') { c.beginPath(); c.arc(0,-34,10,Math.PI,0); c.fill();
-    c.fillRect(-10,-34,3,7); c.fillRect(7,-34,3,7); }
+  if (av.hair==='short') { c.beginPath(); c.arc(0,-34,8,Math.PI,0); c.fill();
+    c.fillRect(-8,-34,3,3); c.fillRect(5,-34,3,3); }
   else if (av.hair==='long') { c.beginPath(); c.arc(0,-34,10,Math.PI,0); c.fill();
-    c.fillRect(-11,-34,4,17); c.fillRect(7,-34,4,17); }
+    if (acc!=='cap') { c.fillRect(-11,-34,4,17); c.fillRect(7,-34,4,17); } }
   else if (av.hair==='spiky') { [-8,-3,2,7].forEach(hx => { c.beginPath();
     c.moveTo(hx-3,-32); c.lineTo(hx+3,-32); c.lineTo(hx,-44); c.closePath(); c.fill(); });
     c.fillRect(-10,-34,20,3); }
@@ -670,9 +678,9 @@ function drawChar(c, av, face) {
 
   // kacamata (di atas mata)
   if (acc==='glasses') {
-    c.strokeStyle='#2b2640'; c.lineWidth=1.5;
-    c.strokeRect(-6+ex,-32,5,5); c.strokeRect(1+ex,-32,5,5);
-    c.beginPath(); c.moveTo(-1+ex,-30); c.lineTo(1+ex,-30); c.stroke();
+    c.strokeStyle='#2b2640'; c.lineWidth=2;
+    c.strokeRect(-7+ex,-32,7,7); c.strokeRect(1+ex,-32,7,7);
+    c.beginPath(); c.moveTo(0+ex,-29); c.lineTo(1+ex,-29); c.stroke();
   }
   // badge staff (di dada)
   if (acc==='badge') {
@@ -736,11 +744,70 @@ function render(t) {
   if (me) ents.push({d:depthOf(me.fx,me.fy)+.01, draw:()=>drawAvatar(me,t)});
   others.forEach(o => ents.push({d:depthOf(o.fx,o.fy), draw:()=>drawAvatar(o,t)}));
   ents.sort((a,b) => a.d-b.d).forEach(e => e.draw());
+  drawAmbient(t);
 
   parts.forEach(p => { ctx.globalAlpha=Math.max(0,p.life); ctx.fillStyle=C.rose;
     ctx.font='18px VT323'; ctx.textAlign='center'; ctx.fillText('♥',p.x,p.y); ctx.globalAlpha=1; });
   drawDoorLabels();
   updateCount();
+}
+
+// -- Ambient furniture animations: dihitung murni dari t, tanpa state tambahan --
+function drawAmbient(t) {
+  getRoom().furniture.forEach(f => {
+    if      (f.kind==='fountain') drawFountainSpray(f, t);
+    else if (f.kind==='tv')       drawTvFlicker(f, t);
+    else if (f.kind==='computer') drawComputerGlow(f, t);
+    else if (f.kind==='stove')    drawStoveShimmer(f, t);
+  });
+}
+function drawFountainSpray(f, t) {
+  const s = iso(f.gx, f.gy); const cx = s.x, cy = s.y - 16;
+  const count = 7, cycle = 1100;
+  for (let i = 0; i < count; i++) {
+    const p = ((t + i * (cycle / count)) % cycle) / cycle;
+    const angle = i * (Math.PI * 2 / count);
+    const r = p * 13;
+    const rise = -34 * Math.sin(p * Math.PI);
+    const x = cx + Math.cos(angle) * r;
+    const y = cy + rise + Math.sin(angle) * r * 0.35;
+    ctx.fillStyle = (i % 3 === 0) ? '#ffffff' : '#88ccff';
+    ctx.globalAlpha = 0.85 * (1 - p * 0.4);
+    ctx.beginPath(); ctx.arc(x, y, 2 + (1 - p) * 1, 0, 7); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+function drawTvFlicker(f, t) {
+  const s = iso(f.gx, f.gy);
+  const sx = s.x - 17, sy = s.y - 27, w = 34, h = 18;
+  const channel = Math.floor(t / 160);
+  const hue = (channel * 47) % 360, light = 45 + (channel * 31 % 20);
+  ctx.save();
+  ctx.globalAlpha = 0.55; ctx.fillStyle = `hsl(${hue}, 80%, ${light}%)`;
+  ctx.fillRect(sx, sy, w, h);
+  ctx.globalAlpha = 0.25; ctx.shadowColor = `hsl(${hue}, 80%, 60%)`; ctx.shadowBlur = 14;
+  ctx.fillRect(sx, sy, w, h);
+  ctx.restore();
+}
+function drawComputerGlow(f, t) {
+  const s = iso(f.gx, f.gy);
+  const sx = s.x - 10, sy = s.y - 25, w = 20, h = 14;
+  const phase = (f.gx + f.gy) * 300;
+  const pulse = 0.5 + 0.5 * Math.sin((t + phase) / 2000 * Math.PI * 2);
+  ctx.save();
+  ctx.globalAlpha = 0.25 + pulse * 0.35; ctx.fillStyle = '#aaccff';
+  ctx.fillRect(sx, sy, w, h);
+  ctx.restore();
+}
+function drawStoveShimmer(f, t) {
+  const s = iso(f.gx, f.gy);
+  [[-9,-4],[9,-4],[-9,6]].forEach(([dx,dy], i) => {
+    const pulse = 0.5 + 0.5 * Math.sin(t / 500 + i * 2);
+    ctx.save();
+    ctx.globalAlpha = 0.75; ctx.fillStyle = pulse > 0.5 ? '#ff6600' : '#cc2200';
+    ctx.beginPath(); ctx.arc(s.x + dx, s.y + dy, 2.5 + pulse * 1.2, 0, 7); ctx.fill();
+    ctx.restore();
+  });
 }
 
 // -- updateCount: DOM hanya disentuh saat nilai benar-benar berubah --
