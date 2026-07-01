@@ -111,6 +111,42 @@ const ROOMS = {
     neighbors:{up:null,down:null,left:'gym',right:null},
   },
 };
+const FRAMES = {
+  lobby:    [ {gy:2, wall:'left', img:'assets/lobby-1.png',   frame:'gold'},
+              {gy:7, wall:'top',  img:'assets/lobby-2.png',   frame:'gold'} ], // gx:5 nabrak pintu lobby<->gym, dipindah ke 7
+  gym:      [ {gy:2, wall:'left', img:'assets/gym-1.png',     frame:'metal'},
+              {gy:6, wall:'top',  img:'assets/gym-2.png',     frame:'metal'} ],
+  garden:   [ {gy:2, wall:'left', img:'assets/garden-1.png',  frame:'wood'},
+              {gy:6, wall:'top',  img:'assets/garden-2.png',  frame:'wood'} ],
+  kitchen:  [ {gy:2, wall:'left', img:'assets/kitchen-1.png', frame:'white'},
+              {gy:6, wall:'top',  img:'assets/kitchen-2.png', frame:'white'} ],
+  gameroom: [ {gy:2, wall:'left', img:'assets/game-1.png',    frame:'neon'},
+              {gy:6, wall:'top',  img:'assets/game-2.png',    frame:'neon'} ],
+  office:   [ {gy:2, wall:'left', img:'assets/office-1.png',  frame:'dark'},
+              {gy:6, wall:'top',  img:'assets/office-2.png',  frame:'dark'} ],
+};
+const ROOM_PLACEHOLDER = { lobby:'#e8b4c8', gym:'#8aa0c0', garden:'#8fc98a', kitchen:'#e0b878', gameroom:'#9a7ad6', office:'#a8b4c8' };
+const FRAME_STYLES = {
+  gold:  {border:'#c8a020', thick:4, mat:'#fff6ec'},
+  metal: {border:'#aaaaaa', thick:2, mat:null},
+  wood:  {border:'#8B5e3c', thick:3, mat:null},
+  white: {border:'#f0f0f0', thick:2, mat:null},
+  neon:  {border:'#1a1a2e', thick:3, mat:null, glow:['#c060ff','#5bf0ff']},
+  dark:  {border:'#2a2a3a', thick:3, mat:null},
+};
+const _frameImgCache = new Map();
+function getFrameImage(path) {
+  let entry = _frameImgCache.get(path);
+  if (entry) return entry;
+  const img = new Image();
+  entry = { img, status:'loading' };
+  _frameImgCache.set(path, entry);
+  img.onload  = () => { entry.status='loaded';
+    if ((FRAMES[currentRoomId]||[]).some(f => f.img===path)) buildRoomBG(); }; // gambar telat load -> rebuild bg biar keganti
+  img.onerror = () => { entry.status='error'; }; // tetap placeholder selamanya, gak retry
+  img.src = path;
+  return entry;
+}
 let currentRoomId = 'lobby';
 function getRoom()       { return ROOMS[currentRoomId]; }
 function applyPalette(r) {
@@ -341,10 +377,43 @@ function finishBuilder() {
 cv.addEventListener('pointerdown', e => {
   if (!me) return;
   const r = cv.getBoundingClientRect();
-  const t = unIso(e.clientX-r.left, e.clientY-r.top);
+  const cx = e.clientX-r.left, cy = e.clientY-r.top;
+  const hit = frameHitAt(cx, cy);
+  if (hit) { openFrameModal(hit.frame, hit.idx); return; }
+  const t = unIso(cx, cy);
   me.tx = Math.max(0, Math.min(GW-1, Math.round(t.gx)));
   me.ty = Math.max(0, Math.min(GH-1, Math.round(t.gy)));
 });
+function frameHitAt(cx, cy) {
+  const list = FRAMES[currentRoomId]; if (!list) return null;
+  for (let i=0; i<list.length; i++) {
+    const f = list[i]; const a = frameWallAnchor(f);
+    if (Math.abs(cx-a.x) < 24 && Math.abs(cy-a.y) < 16) return { frame:f, idx:i };
+  }
+  return null;
+}
+function openFrameModal(frame, idx) {
+  const modal = document.getElementById('frame-modal'); if (!modal) return;
+  const img = document.getElementById('frameModalImg');
+  const wrap = document.getElementById('frameImgWrap');
+  wrap.style.background = ROOM_PLACEHOLDER[currentRoomId] || '#888';
+  img.style.display = '';
+  img.onerror = () => { img.style.display = 'none'; }; // gambar belum ada -> placeholder color kelihatan
+  img.src = frame.img;
+  document.getElementById('frameModalCaption').textContent = getRoom().name + ' — Photo ' + (idx+1);
+  modal.style.display = 'flex';
+}
+function closeFrameModal() {
+  const modal = document.getElementById('frame-modal'); if (modal) modal.style.display = 'none';
+}
+(function initFrameModal() {
+  const modal = document.getElementById('frame-modal');
+  if (!modal) return;
+  modal.addEventListener('click', e => { if (e.target === modal) closeFrameModal(); });
+  const closeBtn = document.getElementById('frameCloseBtn');
+  if (closeBtn) closeBtn.onclick = closeFrameModal;
+  window.addEventListener('keydown', e => { if (e.key === 'Escape') closeFrameModal(); });
+})();
 const msgIn = document.getElementById('msg');
 function send() {
   const t = msgIn.value.trim(); if (!t||!me) return; msgIn.value = '';
@@ -412,11 +481,44 @@ function drawFloor() {
       : quad(a.x,a.y,b.x,b.y,b.x,b.y-H,a.x,a.y-H,C.wallR); }
   const wins = getRoom().windows||[];
   wins.forEach(w => { const p=iso(0,w.gy); drawWindow(p.x,p.y-H+6); });
+  drawRoomFrames();
 }
 function drawWindow(x,y) { ctx.save(); ctx.fillStyle='#bfe6ff'; ctx.fillRect(x-2,y,30,28);
   ctx.strokeStyle=C.ink; ctx.lineWidth=2; ctx.strokeRect(x-2,y,30,28);
   ctx.beginPath(); ctx.moveTo(x+13,y); ctx.lineTo(x+13,y+28); ctx.moveTo(x-2,y+14); ctx.lineTo(x+28,y+14);
   ctx.stroke(); ctx.restore(); }
+function frameWallAnchor(f) {
+  const H = 46;
+  const a = f.wall==='top' ? iso(f.gy, 0)   : iso(0, f.gy);
+  const b = f.wall==='top' ? iso(f.gy+1, 0) : iso(0, f.gy+1);
+  return { x:a.x, y:a.y-H+6, shear:(b.y-a.y)/(b.x-a.x) };
+}
+function drawFrame(ctx, x, y, shear, style, imgPath, placeholderColor) {
+  const w=36, h=28; const st = FRAME_STYLES[style] || FRAME_STYLES.dark;
+  const bx=-w/2, by=-h/2;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.transform(1, shear, 0, 1, 0, 0); // ikutin kemiringan wall biar nempel rata, bukan ngambang
+  if (st.glow) { ctx.save(); ctx.strokeStyle=st.glow[1]; ctx.lineWidth=1; ctx.globalAlpha=.8;
+    ctx.strokeRect(bx-2,by-2,w+4,h+4); ctx.restore(); }
+  ctx.save();
+  if (st.glow) { ctx.shadowColor=st.glow[0]; ctx.shadowBlur=8; }
+  ctx.fillStyle=st.border; ctx.strokeStyle=C.ink; ctx.lineWidth=1.5;
+  ctx.fillRect(bx,by,w,h); ctx.strokeRect(bx,by,w,h);
+  ctx.restore();
+  let ix=bx+st.thick, iy=by+st.thick, iw=w-st.thick*2, ih=h-st.thick*2;
+  if (st.mat) { ctx.fillStyle=st.mat; ctx.fillRect(ix,iy,iw,ih); ix+=3; iy+=3; iw-=6; ih-=6; }
+  const entry = getFrameImage(imgPath);
+  if (entry.status==='loaded') ctx.drawImage(entry.img, ix, iy, iw, ih);
+  else { ctx.fillStyle=placeholderColor; ctx.fillRect(ix,iy,iw,ih); }
+  ctx.strokeStyle='rgba(0,0,0,.3)'; ctx.lineWidth=1; ctx.strokeRect(ix,iy,iw,ih);
+  ctx.restore();
+}
+function drawRoomFrames() {
+  const list = FRAMES[currentRoomId]; if (!list) return;
+  const ph = ROOM_PLACEHOLDER[currentRoomId] || '#cccccc';
+  list.forEach(f => { const a = frameWallAnchor(f); drawFrame(ctx, a.x, a.y, a.shear, f.frame, f.img, ph); });
+}
 function drawFurniture(f) { const s=iso(f.gx,f.gy);
   if (f.kind==='rug') { ctx.save(); ctx.globalAlpha=.85;
     ctx.beginPath(); ctx.ellipse(s.x,s.y+TH/2,TW*1.05,TH*1.05,0,0,7); ctx.fillStyle=C.rose; ctx.fill();

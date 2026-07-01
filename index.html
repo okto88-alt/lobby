@@ -8,6 +8,21 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<style>
+  #frame-modal{position:fixed;inset:0;z-index:30;display:none;align-items:center;justify-content:center;
+    background:rgba(10,8,20,.75);padding:20px;}
+  #frame-modal .frame-box{position:relative;max-width:480px;width:100%;background:var(--ink,#2b2640);
+    border-radius:16px;padding:14px;box-shadow:0 10px 40px rgba(0,0,0,.5);}
+  #frame-modal .frame-img-wrap{border-radius:10px;overflow:hidden;min-height:200px;display:flex;
+    align-items:center;justify-content:center;}
+  #frame-modal .frame-img{display:block;width:100%;border-radius:10px;}
+  #frame-modal .frame-caption{color:#fff;font-family:'VT323',monospace;font-size:18px;text-align:center;
+    margin-top:10px;opacity:.85;}
+  #frame-modal .frame-close{position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;
+    background:#2b2640;color:#fff;border:3px solid #fff;font-size:20px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-family:sans-serif;}
+  #frame-modal .frame-close:hover{background:#ff6b6b;}
+</style>
 </head>
 <body>
 
@@ -46,6 +61,17 @@
     <div class="opt"><span>Baju</span><div class="row" id="rowShirt"></div></div>
     <button class="go" id="enterBtn">MASUK ROOM</button>
     <div class="hint">Tap lantai buat jalan · Enter buat chat · ♥ kasih reaksi</div>
+  </div>
+</div>
+
+<!-- PHOTO FRAMES -->
+<div id="frame-modal">
+  <div class="frame-box">
+    <button class="frame-close" id="frameCloseBtn">&times;</button>
+    <div class="frame-img-wrap" id="frameImgWrap">
+      <img class="frame-img" id="frameModalImg" alt="Photo" />
+    </div>
+    <div class="frame-caption" id="frameModalCaption"></div>
   </div>
 </div>
 
