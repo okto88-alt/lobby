@@ -632,7 +632,7 @@ let channel=null, sb=null, statusLabel='Online', lastMoveSent=0, lastX=null, las
 let _reconnecting = false; // guard biar tidak dobel channel saat error beruntun
 let moveStopTimer = null; // debounce: track() 600ms setelah berhenti gerak
 let subscribed = false; // true hanya saat channel benar-benar SUBSCRIBED
-let watchdogInterval = null, lastBroadcastSent = 0; // deteksi channel yang mati diam-diam
+let socket = null; // Socket.io — movement realtime, terpisah dari Supabase
 
 function initOnline() {
   statusLabel = 'Connecting'; updateCount();
@@ -653,21 +653,19 @@ async function saveProfile() {
 function startRealtime() {
   // createClient hanya sekali; resubscribe reuse sb yang sama
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  socket = io('https://driving-flights-economics-historic.trycloudflare.com');
+  socket.on('connect', () => console.log('[socket] connected:', socket.id));
+  socket.on('move', (data) => {
+    const o = others.get(data.id);
+    if (o) { o.tx = data.tx; o.ty = data.ty;
+      if (!o.posSet) { o.fx = data.tx; o.fy = data.ty; o.posSet = true; } }
+  });
   setupChannel();
-}
-function startWatchdog() {
-  clearInterval(watchdogInterval);
-  watchdogInterval = setInterval(() => {
-    if (me && subscribed && (me.tx!==lastX || me.ty!==lastY) && (performance.now()-lastBroadcastSent>5000)) {
-      resubscribe(); // channel mati diam-diam: gak ada broadcast sukses padahal masih gerak
-    }
-  }, 5000);
 }
 function setupChannel() {
   const _topic = 'room:'+ROOM_CODE+':'+currentRoomId;
   const ch = sb.channel(_topic, {config:{presence:{key:myId}, broadcast:{self:false}}});
   channel = ch;
-  startWatchdog();
 
   ch.on('presence', {event:'sync'}, () => {
     const st = ch.presenceState(); const live = new Set();
@@ -679,9 +677,6 @@ function setupChannel() {
     [...others.keys()].forEach(id => { if (!live.has(id)) others.delete(id); });
     updateCount();
   });
-  ch.on('broadcast', {event:'move'}, ({payload}) => { const o=others.get(payload.id);
-    if (o) { o.tx=payload.tx; o.ty=payload.ty;
-      if (!o.posSet) { o.fx=payload.tx; o.fy=payload.ty; o.posSet=true; } } });
   ch.on('broadcast', {event:'chat'}, ({payload}) => { let o=others.get(payload.id);
     if (o) { say(o, payload.text); } addLog(payload.name, payload.text, false); });
   ch.on('broadcast', {event:'emote'}, ({payload}) => { const o=others.get(payload.id); if(o) spawnHearts(o); });
@@ -690,9 +685,9 @@ function setupChannel() {
     if (st === 'SUBSCRIBED') {
       _reconnecting = false;
       subscribed = true;
-      lastBroadcastSent = performance.now(); // baseline biar watchdog gak langsung false-positive
       statusLabel = 'Online'; document.getElementById('dot').classList.add('on');
       await ch.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy});
+      if (socket) socket.emit('join-room', currentRoomId);
       updateCount();
     } else if (st === 'CHANNEL_ERROR' || st === 'TIMED_OUT') {
       // reset flag dulu — jika reconnect attempt-nya sendiri gagal, retry tetap bisa jalan
@@ -714,7 +709,6 @@ async function resubscribe() {
 // Tidak untrack saat visibilitychange=hidden supaya avatar tidak kedip di mobile
 async function cleanupChannel() {
   subscribed = false;
-  clearInterval(watchdogInterval); watchdogInterval = null;
   if (!channel || !sb) return;
   const ch = channel;
   channel = null;
@@ -770,13 +764,14 @@ async function enterRoom(roomId, fromSide) {
     others.clear();         // baru clear setelah channel lama benar-benar mati
     updateCount();
     setupChannel();
+    if (socket) socket.emit('join-room', currentRoomId);
   } else {
     others.clear();
     updateCount();
   }
 }
 
-function sendMove() { if(channel && subscribed) { channel.send({type:'broadcast',event:'move',payload:{id:myId,tx:me.tx,ty:me.ty}}); lastBroadcastSent = performance.now(); } }
+function sendMove() { if (socket && socket.connected) socket.emit('move', { room: currentRoomId, id: myId, tx: me.tx, ty: me.ty }); }
 function maybeSendMove() { const now=performance.now();
   if (now-lastMoveSent>120 && (me.tx!==lastX || me.ty!==lastY)) { lastMoveSent=now; lastX=me.tx; lastY=me.ty;
     sendMove();
