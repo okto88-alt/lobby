@@ -250,7 +250,7 @@ function applyCloset() {
   me.av = JSON.parse(JSON.stringify(draft.av));
   localStorage.setItem('lobbyAvatar', JSON.stringify({name:me.name, av:me.av}));
   builderEl.style.display = 'none'; builderEl.onclick = null;
-  if (ONLINE) { saveProfile(); if (channel) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}); }
+  if (ONLINE) { saveProfile(); if (channel && subscribed) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}); }
 }
 async function loadProfileByName(name) {
   const note = document.getElementById('loadNote'); note.textContent = 'Cek avatar lama...';
@@ -297,13 +297,13 @@ const msgIn = document.getElementById('msg');
 function send() {
   const t = msgIn.value.trim(); if (!t||!me) return; msgIn.value = '';
   say(me, t); addLog(me.name, t, true);
-  if (ONLINE && channel) channel.send({type:'broadcast',event:'chat',payload:{id:myId,name:me.name,text:t}});
+  if (ONLINE && channel && subscribed) channel.send({type:'broadcast',event:'chat',payload:{id:myId,name:me.name,text:t}});
   else demoReply(t);
 }
 document.getElementById('sendBtn').onclick = send;
 msgIn.addEventListener('keydown', e => { if(e.key==='Enter') send(); });
 function heart() { if (!me) return; spawnHearts(me);
-  if (ONLINE && channel) channel.send({type:'broadcast',event:'emote',payload:{id:myId}}); }
+  if (ONLINE && channel && subscribed) channel.send({type:'broadcast',event:'emote',payload:{id:myId}}); }
 document.getElementById('heartBtn').onclick = heart;
 
 // tombol Lemari (ganti baju saat di room)
@@ -631,6 +631,8 @@ function demoReply() { const arr=[...others.values()]; if (!arr.length) return;
 let channel=null, sb=null, statusLabel='Online', lastMoveSent=0, lastX=null, lastY=null;
 let _reconnecting = false; // guard biar tidak dobel channel saat error beruntun
 let moveStopTimer = null; // debounce: track() 600ms setelah berhenti gerak
+let subscribed = false; // true hanya saat channel benar-benar SUBSCRIBED
+let watchdogInterval = null, lastBroadcastSent = 0; // deteksi channel yang mati diam-diam
 
 function initOnline() {
   statusLabel = 'Connecting'; updateCount();
@@ -653,10 +655,19 @@ function startRealtime() {
   sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   setupChannel();
 }
+function startWatchdog() {
+  clearInterval(watchdogInterval);
+  watchdogInterval = setInterval(() => {
+    if (me && subscribed && (me.tx!==lastX || me.ty!==lastY) && (performance.now()-lastBroadcastSent>5000)) {
+      resubscribe(); // channel mati diam-diam: gak ada broadcast sukses padahal masih gerak
+    }
+  }, 5000);
+}
 function setupChannel() {
   const _topic = 'room:'+ROOM_CODE+':'+currentRoomId;
   const ch = sb.channel(_topic, {config:{presence:{key:myId}, broadcast:{self:false}}});
   channel = ch;
+  startWatchdog();
 
   ch.on('presence', {event:'sync'}, () => {
     const st = ch.presenceState(); const live = new Set();
@@ -678,6 +689,8 @@ function setupChannel() {
   ch.subscribe(async st => {
     if (st === 'SUBSCRIBED') {
       _reconnecting = false;
+      subscribed = true;
+      lastBroadcastSent = performance.now(); // baseline biar watchdog gak langsung false-positive
       statusLabel = 'Online'; document.getElementById('dot').classList.add('on');
       await ch.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy});
       updateCount();
@@ -700,6 +713,8 @@ async function resubscribe() {
 // -- Ghost cleanup: untrack + removeChannel hanya saat tab benar-benar ditutup --
 // Tidak untrack saat visibilitychange=hidden supaya avatar tidak kedip di mobile
 async function cleanupChannel() {
+  subscribed = false;
+  clearInterval(watchdogInterval); watchdogInterval = null;
   if (!channel || !sb) return;
   const ch = channel;
   channel = null;
@@ -761,12 +776,12 @@ async function enterRoom(roomId, fromSide) {
   }
 }
 
-function sendMove() { if(channel) channel.send({type:'broadcast',event:'move',payload:{id:myId,tx:me.tx,ty:me.ty}}); }
+function sendMove() { if(channel && subscribed) { channel.send({type:'broadcast',event:'move',payload:{id:myId,tx:me.tx,ty:me.ty}}); lastBroadcastSent = performance.now(); } }
 function maybeSendMove() { const now=performance.now();
   if (now-lastMoveSent>120 && (me.tx!==lastX || me.ty!==lastY)) { lastMoveSent=now; lastX=me.tx; lastY=me.ty;
     sendMove();
     clearTimeout(moveStopTimer);
-    moveStopTimer = setTimeout(() => { if (channel) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}); }, 600);
+    moveStopTimer = setTimeout(() => { if (channel && subscribed) channel.track({name:me.name, av:me.av, fx:me.fx, fy:me.fy}); }, 600);
   } }
 
 // -- Mobile: naikkan chat bar + log saat keyboard virtual muncul --
