@@ -661,6 +661,9 @@ function startRealtime() {
     if (o) { o.tx = data.tx; o.ty = data.ty;
       if (!o.posSet) { o.fx = data.tx; o.fy = data.ty; o.posSet = true; } }
   });
+  socket.on('change-room', (data) => {
+    if (data.newRoom !== currentRoomId) others.delete(data.id);
+  });
   setupChannel();
 }
 function startWatchdog() {
@@ -777,7 +780,7 @@ async function enterRoom(roomId, fromSide) {
     others.clear();         // baru clear setelah channel lama benar-benar mati
     updateCount();
     setupChannel();
-    if (socket) socket.emit('join-room', currentRoomId);
+    if (socket) { socket.emit('join-room', currentRoomId); socket.emit('change-room', { id: myId, newRoom: currentRoomId }); }
   } else {
     others.clear();
     updateCount();
